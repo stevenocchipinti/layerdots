@@ -1,0 +1,1152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A visual guide to Layerdots: public base dotfiles composed with private overlays.">
+  <title>Layerdots - Visual Field Guide</title>
+  <style>
+    :root {
+      --paper: #f3efe3;
+      --paper-deep: #e7dfcc;
+      --ink: #17201e;
+      --muted: #5c655f;
+      --rule: rgba(23, 32, 30, 0.19);
+      --base: #176b87;
+      --base-soft: #d5e8eb;
+      --overlay: #b6422c;
+      --overlay-soft: #f1d9ce;
+      --home: #48733c;
+      --home-soft: #dae5cf;
+      --stage: #ad7418;
+      --stage-soft: #f0e1b9;
+      --state: #67558c;
+      --state-soft: #e1dced;
+      --shadow: 0 18px 50px rgba(34, 40, 34, 0.12), 0 2px 6px rgba(34, 40, 34, 0.08);
+      --mono: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+      --serif: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, serif;
+      --sans: Avenir, "Avenir Next", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      color-scheme: light;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(23, 32, 30, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 32, 30, 0.035) 1px, transparent 1px),
+        var(--paper);
+      background-size: 24px 24px;
+      font-family: var(--sans);
+      line-height: 1.55;
+    }
+
+    body::before {
+      position: fixed;
+      z-index: -1;
+      inset: 0;
+      background: radial-gradient(circle at 75% 8%, rgba(23, 107, 135, 0.1), transparent 34%);
+      content: "";
+      pointer-events: none;
+    }
+
+    a { color: inherit; }
+
+    button, a { -webkit-tap-highlight-color: transparent; }
+
+    code, pre { font-family: var(--mono); }
+
+    .shell {
+      width: min(1180px, calc(100% - 40px));
+      margin-inline: auto;
+    }
+
+    .masthead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 72px;
+      border-bottom: 1px solid var(--rule);
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .brand { font-weight: 800; }
+
+    .brand::before {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      margin-right: 9px;
+      background: var(--overlay);
+      box-shadow: 5px 5px 0 var(--base);
+      content: "";
+      transform: translateY(-2px);
+    }
+
+    .masthead nav { display: flex; gap: 22px; }
+    .masthead a { text-decoration: none; }
+    .masthead a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr);
+      gap: clamp(40px, 8vw, 110px);
+      align-items: end;
+      min-height: 640px;
+      padding-block: 90px 72px;
+    }
+
+    .eyebrow, .section-index, .tag {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow { color: var(--overlay); }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 780px;
+      margin-bottom: 28px;
+      font-family: var(--serif);
+      font-size: clamp(58px, 9vw, 118px);
+      font-weight: 500;
+      letter-spacing: -0.065em;
+      line-height: 0.86;
+      text-wrap: balance;
+    }
+
+    h1 em {
+      color: var(--base);
+      font-weight: inherit;
+      text-decoration: underline;
+      text-decoration-color: var(--overlay);
+      text-decoration-thickness: 0.08em;
+      text-underline-offset: 0.08em;
+    }
+
+    .hero-lede {
+      max-width: 660px;
+      margin-bottom: 0;
+      color: #36403c;
+      font-family: var(--serif);
+      font-size: clamp(19px, 2.2vw, 27px);
+      line-height: 1.35;
+      text-wrap: pretty;
+    }
+
+    .hero-note {
+      position: relative;
+      padding: 30px;
+      background: rgba(255, 252, 243, 0.72);
+      box-shadow: var(--shadow);
+      transform: rotate(1.2deg);
+    }
+
+    .hero-note::before {
+      position: absolute;
+      top: -10px;
+      left: 34px;
+      width: 88px;
+      height: 22px;
+      background: rgba(214, 192, 136, 0.55);
+      content: "";
+      transform: rotate(-4deg);
+    }
+
+    .hero-note strong {
+      display: block;
+      margin-bottom: 18px;
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .hero-note ol { margin: 0; padding-left: 22px; }
+    .hero-note li + li { margin-top: 10px; }
+
+    .section {
+      padding-block: 92px;
+      border-top: 1px solid var(--rule);
+    }
+
+    .section-heading {
+      display: grid;
+      grid-template-columns: 110px minmax(0, 1fr);
+      gap: 28px;
+      margin-bottom: 56px;
+    }
+
+    .section-index { padding-top: 9px; color: var(--muted); }
+
+    h2 {
+      max-width: 860px;
+      margin-bottom: 12px;
+      font-family: var(--serif);
+      font-size: clamp(38px, 5vw, 68px);
+      font-weight: 500;
+      letter-spacing: -0.045em;
+      line-height: 1;
+      text-wrap: balance;
+    }
+
+    .section-intro {
+      max-width: 700px;
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 18px;
+      text-wrap: pretty;
+    }
+
+    .equation {
+      display: grid;
+      grid-template-columns: 1fr 60px 1fr 60px 1fr;
+      align-items: stretch;
+      margin-top: 24px;
+    }
+
+    .equation-card {
+      position: relative;
+      min-height: 280px;
+      padding: 28px;
+      overflow: hidden;
+      background: #faf6eb;
+      box-shadow: var(--shadow);
+    }
+
+    .equation-card::after {
+      position: absolute;
+      right: -30px;
+      bottom: -45px;
+      font-family: var(--serif);
+      font-size: 150px;
+      line-height: 1;
+      opacity: 0.06;
+    }
+
+    .equation-card.base::after { content: "B"; color: var(--base); }
+    .equation-card.overlay::after { content: "O"; color: var(--overlay); }
+    .equation-card.home::after { content: "H"; color: var(--home); }
+
+    .equation-card h3 {
+      margin: 16px 0 12px;
+      font-family: var(--serif);
+      font-size: 31px;
+      font-weight: 500;
+      letter-spacing: -0.03em;
+    }
+
+    .equation-card p { color: var(--muted); }
+
+    .equation-card .tag { display: inline-block; padding: 5px 8px; }
+    .base .tag { color: var(--base); background: var(--base-soft); }
+    .overlay .tag { color: var(--overlay); background: var(--overlay-soft); }
+    .home .tag { color: var(--home); background: var(--home-soft); }
+
+    .operator {
+      display: grid;
+      place-items: center;
+      font-family: var(--serif);
+      font-size: 42px;
+    }
+
+    .tiny-tree {
+      position: relative;
+      z-index: 1;
+      margin: 18px 0 0;
+      padding: 16px;
+      overflow-x: auto;
+      background: rgba(23, 32, 30, 0.055);
+      font-size: 12px;
+      line-height: 1.7;
+      white-space: pre;
+    }
+
+    .location-map {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+      padding: 34px;
+      background: #17201e;
+      color: #f8f3e8;
+      box-shadow: var(--shadow);
+    }
+
+    .location-map::before {
+      position: absolute;
+      inset: 12px;
+      border: 1px dashed rgba(255, 255, 255, 0.14);
+      content: "";
+      pointer-events: none;
+    }
+
+    .location {
+      position: relative;
+      z-index: 1;
+      padding: 22px;
+      background: #222c29;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.11);
+    }
+
+    .location.remote { grid-column: span 5; }
+    .location.clones { grid-column: span 7; }
+    .location.stage { grid-column: span 4; }
+    .location.state { grid-column: span 4; }
+    .location.target { grid-column: span 4; }
+
+    .location h3 {
+      margin: 10px 0 10px;
+      font-family: var(--serif);
+      font-size: 25px;
+      font-weight: 500;
+    }
+
+    .location p { margin-bottom: 14px; color: #bac2bc; font-size: 14px; }
+
+    .location code {
+      display: block;
+      overflow-wrap: anywhere;
+      color: #fff8e7;
+      font-size: 12px;
+    }
+
+    .location .signal {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 12px currentColor;
+    }
+
+    .remote .tag { color: #8fc6d8; }
+    .clones .tag { color: #f19377; }
+    .stage .tag { color: #e6b956; }
+    .state .tag { color: #bdaee1; }
+    .target .tag { color: #9cc28c; }
+
+    .warning-strip {
+      margin-top: 18px;
+      padding: 15px 18px;
+      border-left: 4px solid var(--stage);
+      background: var(--stage-soft);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .workflow {
+      overflow: hidden;
+      background: #fbf7ec;
+      box-shadow: var(--shadow);
+    }
+
+    .step-tabs {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .step-tab {
+      min-height: 70px;
+      padding: 14px 10px;
+      border: 0;
+      border-right: 1px solid var(--rule);
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.25;
+      text-transform: uppercase;
+      transition-property: color, background-color, transform;
+      transition-duration: 160ms;
+      transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    .step-tab:last-child { border-right: 0; }
+    .step-tab:hover { color: var(--ink); background: var(--paper); }
+    .step-tab:active { transform: scale(0.96); }
+    .step-tab[aria-selected="true"] { color: #fff; background: var(--ink); }
+
+    .step-number {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 10px;
+      opacity: 0.65;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .workflow-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(270px, 0.55fr);
+      min-height: 510px;
+    }
+
+    .workflow-canvas {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 54px 70px;
+      align-content: center;
+      padding: 60px;
+      border-right: 1px solid var(--rule);
+      background-image: radial-gradient(rgba(23, 32, 30, 0.13) 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+
+    .flow-node {
+      position: relative;
+      min-height: 128px;
+      padding: 18px;
+      background: #fffdf6;
+      box-shadow: 0 10px 28px rgba(23, 32, 30, 0.12), inset 0 0 0 1px var(--rule);
+      transition-property: opacity, transform, box-shadow;
+      transition-duration: 240ms;
+      transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    .flow-node::before {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 5px;
+      height: 100%;
+      background: var(--node-color);
+      content: "";
+    }
+
+    .flow-node[data-node="remote"] { --node-color: var(--base); }
+    .flow-node[data-node="clones"] { --node-color: var(--overlay); }
+    .flow-node[data-node="stage"] { --node-color: var(--stage); }
+    .flow-node[data-node="home"] { --node-color: var(--home); }
+
+    .flow-node.is-active {
+      z-index: 2;
+      box-shadow: 0 14px 40px rgba(23, 32, 30, 0.18), inset 0 0 0 3px var(--node-color);
+      transform: translateY(-4px);
+    }
+
+    .flow-node.is-muted { opacity: 0.34; transform: scale(0.985); }
+
+    .flow-node h3 { margin: 7px 0 8px; font-family: var(--mono); font-size: 15px; }
+    .flow-node p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .node-path {
+      color: var(--node-color);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .flow-node .pulse {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--node-color);
+      opacity: 0;
+    }
+
+    .flow-node.is-active .pulse { opacity: 1; animation: signal 1.4s ease-out infinite; }
+
+    @keyframes signal {
+      0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--node-color) 55%, transparent); }
+      70%, 100% { box-shadow: 0 0 0 10px transparent; }
+    }
+
+    .workflow-copy { padding: 44px 36px; }
+    .workflow-copy .tag { color: var(--overlay); }
+
+    .workflow-copy h3 {
+      margin: 13px 0 16px;
+      font-family: var(--serif);
+      font-size: 34px;
+      font-weight: 500;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      text-wrap: balance;
+    }
+
+    .workflow-copy p { color: var(--muted); text-wrap: pretty; }
+
+    .changes {
+      margin-top: 25px;
+      padding: 16px;
+      background: var(--paper);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .changes strong { display: block; margin-bottom: 8px; color: var(--ink); }
+
+    .repo-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 28px;
+    }
+
+    .repo-card {
+      overflow: hidden;
+      background: #17201e;
+      color: #f8f3e8;
+      box-shadow: var(--shadow);
+    }
+
+    .repo-card header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+    }
+
+    .repo-card h3 { margin: 0; font-family: var(--mono); font-size: 14px; }
+    .repo-card header .tag { color: #adbbb4; }
+
+    .repo-card pre {
+      min-height: 280px;
+      margin: 0;
+      padding: 26px;
+      overflow-x: auto;
+      color: #d7ddd8;
+      font-size: 13px;
+      line-height: 1.85;
+    }
+
+    .file { color: #fff6dc; }
+    .patch { color: #f19377; }
+    .delete { color: #e6b956; }
+    .meta { color: #8fc6d8; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 22px;
+      margin-top: 22px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .legend span::before {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      margin-right: 7px;
+      background: currentColor;
+      content: "";
+    }
+
+    .provenance-demo {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.75fr) minmax(0, 1.25fr);
+      gap: 28px;
+    }
+
+    .provenance-copy {
+      padding: 34px;
+      background: var(--paper-deep);
+    }
+
+    .provenance-copy h3 {
+      margin-bottom: 18px;
+      font-family: var(--serif);
+      font-size: 32px;
+      font-weight: 500;
+      line-height: 1.08;
+    }
+
+    .provenance-copy dl { margin: 28px 0 0; }
+    .provenance-copy dt { font-family: var(--mono); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+    .provenance-copy dd { margin: 4px 0 18px; color: var(--muted); font-size: 14px; }
+
+    .editor {
+      overflow: hidden;
+      background: #111816;
+      color: #e9ede8;
+      box-shadow: var(--shadow);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .editor-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 45px;
+      padding: 0 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      color: #9aa59f;
+      font-size: 11px;
+    }
+
+    .editor-bar i { width: 8px; height: 8px; border-radius: 50%; background: #56615c; }
+    .editor-bar span { margin-left: 8px; }
+
+    .code-line {
+      display: grid;
+      grid-template-columns: 34px 8px 34px minmax(0, 1fr);
+      min-height: 34px;
+      align-items: center;
+    }
+
+    .code-line:hover { background: rgba(255, 255, 255, 0.035); }
+    .owner { padding-left: 10px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+    .gutter { align-self: stretch; background: var(--line-color); }
+    .line-number { color: #66716c; text-align: right; padding-right: 10px; font-variant-numeric: tabular-nums; }
+    .code { overflow-x: auto; padding-right: 14px; white-space: pre; }
+    .base-line { --line-color: var(--base); }
+    .base-line .owner { color: #65b5cf; }
+    .overlay-line { --line-color: var(--overlay); background: rgba(182, 66, 44, 0.1); }
+    .overlay-line .owner { color: #ef8b70; }
+    .unassigned-line { --line-color: var(--stage); background: rgba(173, 116, 24, 0.11); }
+    .unassigned-line .owner { color: #e9bb55; }
+    .override-mark { color: #e6b956; }
+
+    .merge-panel {
+      padding: 34px;
+      background: #fffaf0;
+      box-shadow: var(--shadow);
+    }
+
+    .merge-diagram {
+      display: grid;
+      grid-template-columns: 1fr 72px 1fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .merge-box {
+      min-height: 130px;
+      padding: 20px;
+      box-shadow: inset 0 0 0 1px var(--rule);
+    }
+
+    .merge-box strong { display: block; margin: 8px 0; font-family: var(--serif); font-size: 23px; }
+    .merge-box p { margin: 0; color: var(--muted); font-size: 13px; }
+    .merge-box.old { background: var(--base-soft); }
+    .merge-box.upper { background: var(--overlay-soft); }
+    .merge-box.new { background: var(--home-soft); }
+    .merge-box.result { background: var(--stage-soft); }
+
+    .arrow {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 28px;
+      text-align: center;
+    }
+
+    .merge-down {
+      display: grid;
+      grid-template-columns: 1fr 72px 1fr;
+      margin-block: 16px;
+      color: var(--muted);
+      font-family: var(--mono);
+      text-align: center;
+    }
+
+    .merge-caption {
+      max-width: 720px;
+      margin: 28px auto 0;
+      color: var(--muted);
+      text-align: center;
+      text-wrap: pretty;
+    }
+
+    .rules {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--rule);
+      box-shadow: 0 0 0 1px var(--rule);
+    }
+
+    .rule-card { min-height: 180px; padding: 28px; background: var(--paper); }
+
+    .rule-number {
+      display: block;
+      margin-bottom: 20px;
+      color: var(--overlay);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .rule-card h3 { margin-bottom: 8px; font-family: var(--serif); font-size: 25px; font-weight: 500; }
+    .rule-card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 30px;
+      align-items: end;
+      padding-block: 72px;
+      border-top: 1px solid var(--rule);
+    }
+
+    footer strong { font-family: var(--serif); font-size: 32px; font-weight: 500; }
+    footer p { max-width: 630px; margin: 10px 0 0; color: var(--muted); }
+    footer code { font-size: 12px; }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(18px);
+      transition-property: opacity, transform;
+      transition-duration: 620ms;
+      transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    .reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; min-height: auto; padding-top: 70px; }
+      .hero-note { max-width: 520px; transform: none; }
+      .equation { grid-template-columns: 1fr; gap: 14px; }
+      .operator { min-height: 44px; transform: rotate(90deg); }
+      .location.remote, .location.clones { grid-column: span 12; }
+      .location.stage, .location.state, .location.target { grid-column: span 6; }
+      .workflow-body { grid-template-columns: 1fr; }
+      .workflow-canvas { border-right: 0; border-bottom: 1px solid var(--rule); }
+      .repo-grid, .provenance-demo { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .shell { width: min(100% - 24px, 1180px); }
+      .masthead nav { display: none; }
+      .hero { padding-block: 54px; }
+      h1 { font-size: clamp(52px, 18vw, 78px); }
+      .section { padding-block: 66px; }
+      .section-heading { grid-template-columns: 1fr; gap: 12px; }
+      .section-index { padding: 0; }
+      .location-map { padding: 22px; }
+      .location.stage, .location.state, .location.target { grid-column: span 12; }
+      .step-tabs { grid-template-columns: repeat(3, 1fr); }
+      .step-tab { border-bottom: 1px solid var(--rule); }
+      .workflow-canvas { grid-template-columns: 1fr; gap: 18px; padding: 28px; }
+      .workflow-copy { padding: 32px 24px; }
+      .merge-diagram { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); }
+      .merge-down { grid-template-columns: 1fr; gap: 8px; }
+      .merge-down span:nth-child(2) { display: none; }
+      .rules { grid-template-columns: 1fr; }
+      footer { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="masthead shell">
+    <a class="brand" href="#top">Layerdots</a>
+    <nav aria-label="Guide sections">
+      <a href="#model">Model</a>
+      <a href="#locations">Locations</a>
+      <a href="#lifecycle">Lifecycle</a>
+      <a href="#provenance">Provenance</a>
+    </nav>
+    <span>Visual field guide / v0.1</span>
+  </header>
+
+  <main id="top">
+    <section class="hero shell">
+      <div>
+        <p class="eyebrow">Public foundation. Private correction.</p>
+        <h1>Dotfiles,<br><em>in layers.</em></h1>
+        <p class="hero-lede">Layerdots composes a public personal repository with private work overrides, then treats your home directory as the place where new changes begin.</p>
+      </div>
+      <aside class="hero-note" aria-label="The central promise">
+        <strong>The central promise</strong>
+        <ol>
+          <li>Public content stays public.</li>
+          <li>Private content stays in its overlay.</li>
+          <li>Your home sees one coherent result.</li>
+          <li>You decide where each new change belongs.</li>
+        </ol>
+      </aside>
+    </section>
+
+    <section class="section shell reveal" id="model">
+      <div class="section-heading">
+        <span class="section-index">01 / Model</span>
+        <div>
+          <h2>One result, assembled from separate authorities.</h2>
+          <p class="section-intro">A base contains ordinary files. An overlay contains additions, full replacements, patches, and deletions. Composition produces the effective files used in your home directory.</p>
+        </div>
+      </div>
+
+      <div class="equation" aria-label="Base plus overlay equals composed home">
+        <article class="equation-card base">
+          <span class="tag">Public / base</span>
+          <h3>Personal defaults</h3>
+          <p>Readable files that work everywhere and are safe to publish.</p>
+          <pre class="tiny-tree">home/
+  .gitconfig
+  .config/nvim/init.lua</pre>
+        </article>
+        <div class="operator" aria-hidden="true">+</div>
+        <article class="equation-card overlay">
+          <span class="tag">Private / overlay</span>
+          <h3>Work differences</h3>
+          <p>Only the private additions and differences from the pinned base.</p>
+          <pre class="tiny-tree">home/
+  .gitconfig.patch
+  .config/company/config.json</pre>
+        </article>
+        <div class="operator" aria-hidden="true">=</div>
+        <article class="equation-card home">
+          <span class="tag">Effective / target</span>
+          <h3>Your working home</h3>
+          <p>One normal filesystem. Applications do not need to know layers exist.</p>
+          <pre class="tiny-tree">~/
+  .gitconfig
+  .config/nvim/init.lua
+  .config/company/config.json</pre>
+        </article>
+      </div>
+    </section>
+
+    <section class="section shell reveal" id="locations">
+      <div class="section-heading">
+        <span class="section-index">02 / Places</span>
+        <div>
+          <h2>Five locations, five distinct jobs.</h2>
+          <p class="section-intro">Most confusion disappears once Git remotes, local clones, staging, derived state, and live home files are treated as separate places.</p>
+        </div>
+      </div>
+
+      <div class="location-map">
+        <article class="location remote">
+          <span class="tag"><i class="signal"></i>Remote Git repositories</span>
+          <h3>Shared history</h3>
+          <p>Public GitHub holds the base. GitHub Enterprise holds the private overlay. These are the cross-machine source of truth.</p>
+          <code>github.com/you/dotfiles</code>
+          <code>git.work.example/you/work-dotfiles</code>
+        </article>
+        <article class="location clones">
+          <span class="tag"><i class="signal"></i>Tool-managed clones</span>
+          <h3>Local Git work</h3>
+          <p>Layerdots fetches, generates patches, and creates coordinated commits here. Users normally edit the target, not these clones.</p>
+          <code>$XDG_DATA_HOME/layerdots/repos/...</code>
+        </article>
+        <article class="location stage">
+          <span class="tag"><i class="signal"></i>Staged transaction</span>
+          <h3>Proposed next state</h3>
+          <p>A reviewable plan for assignments, rebases, target writes, and conflict resolutions. It is not yet committed or pushed.</p>
+          <code>$XDG_STATE_HOME/layerdots/transactions/...</code>
+        </article>
+        <article class="location state">
+          <span class="tag"><i class="signal"></i>Derived state</span>
+          <h3>Merge memory</h3>
+          <p>The last applied composition, temporary compositions, and rollback journals make safe three-way updates possible.</p>
+          <code>$XDG_STATE_HOME/layerdots/targets/...</code>
+        </article>
+        <article class="location target">
+          <span class="tag"><i class="signal"></i>Target home</span>
+          <h3>Live configuration</h3>
+          <p>The files programs actually read. Direct edits here become unassigned changes until routed to a layer.</p>
+          <code>~/.gitconfig</code>
+          <code>~/.config/nvim/init.lua</code>
+        </article>
+      </div>
+      <div class="warning-strip">Staging is not a third source of truth. It is a disposable, reviewable proposal between current state and the next committed/applied state.</div>
+    </section>
+
+    <section class="section shell reveal" id="lifecycle">
+      <div class="section-heading">
+        <span class="section-index">03 / Flow</span>
+        <div>
+          <h2>Follow a change through the system.</h2>
+          <p class="section-intro">Select each step to see which locations participate and what becomes durable.</p>
+        </div>
+      </div>
+
+      <div class="workflow">
+        <div class="step-tabs" role="tablist" aria-label="Lifecycle steps">
+          <button class="step-tab" type="button" role="tab" aria-selected="true" data-step="0"><span class="step-number">01</span>Bootstrap</button>
+          <button class="step-tab" type="button" role="tab" aria-selected="false" data-step="1"><span class="step-number">02</span>Compose</button>
+          <button class="step-tab" type="button" role="tab" aria-selected="false" data-step="2"><span class="step-number">03</span>Edit home</button>
+          <button class="step-tab" type="button" role="tab" aria-selected="false" data-step="3"><span class="step-number">04</span>Assign</button>
+          <button class="step-tab" type="button" role="tab" aria-selected="false" data-step="4"><span class="step-number">05</span>Sync</button>
+          <button class="step-tab" type="button" role="tab" aria-selected="false" data-step="5"><span class="step-number">06</span>Publish</button>
+        </div>
+        <div class="workflow-body">
+          <div class="workflow-canvas" aria-label="Lifecycle location diagram">
+            <article class="flow-node" data-node="remote">
+              <i class="pulse"></i>
+              <span class="node-path">GIT HOSTS</span>
+              <h3>Remote repositories</h3>
+              <p>Public base history and private overlay history.</p>
+            </article>
+            <article class="flow-node" data-node="clones">
+              <i class="pulse"></i>
+              <span class="node-path">XDG_DATA_HOME</span>
+              <h3>Managed clones</h3>
+              <p>Checked-out layer repositories and Git operations.</p>
+            </article>
+            <article class="flow-node" data-node="stage">
+              <i class="pulse"></i>
+              <span class="node-path">XDG_STATE_HOME</span>
+              <h3>Transaction + state</h3>
+              <p>Review plans, merge bases, conflicts, and journals.</p>
+            </article>
+            <article class="flow-node" data-node="home">
+              <i class="pulse"></i>
+              <span class="node-path">TARGET: $HOME</span>
+              <h3>Live home files</h3>
+              <p>The composed result plus any unassigned edits.</p>
+            </article>
+          </div>
+          <aside class="workflow-copy" aria-live="polite">
+            <span class="tag" id="step-kicker">Step 01</span>
+            <h3 id="step-title">Start from the private top layer.</h3>
+            <p id="step-description">Layerdots clones the work overlay, reads its pinned parent, then recursively fetches the public base. One top-layer URL discovers the complete stack.</p>
+            <div class="changes">
+              <strong>What changes</strong>
+              <span id="step-changes">Remote repositories are copied into managed local clones. Home is untouched until composition is reviewed and applied.</span>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section shell reveal" id="repositories">
+      <div class="section-heading">
+        <span class="section-index">04 / Repos</span>
+        <div>
+          <h2>The repository trees stay inspectable.</h2>
+          <p class="section-intro">Both roles share one format. The presence of a pinned parent makes a repository an overlay.</p>
+        </div>
+      </div>
+
+      <div class="repo-grid">
+        <article class="repo-card">
+          <header><h3>personal-dotfiles/</h3><span class="tag">No parent = base</span></header>
+          <pre><span class="meta">layerdots.json</span>
+<span class="file">home/</span>
+  <span class="file">.gitconfig</span>
+  <span class="file">.zshrc</span>
+  <span class="file">.config/</span>
+    <span class="file">nvim/init.lua</span>
+
+# Plain, readable source files.
+# Safe to publish.</pre>
+        </article>
+        <article class="repo-card">
+          <header><h3>work-dotfiles/</h3><span class="tag">Pinned parent = overlay</span></header>
+          <pre><span class="meta">layerdots.json</span>  <span class="meta"># URL + branch + SHA</span>
+<span class="file">home/</span>
+  <span class="patch">.gitconfig.patch</span>
+  <span class="file">.config/</span>
+    <span class="file">company/config.json</span>
+  <span class="delete">.old-tool.delete</span>
+
+<span class="patch">.patch</span>   modifies lower UTF-8 text
+<span class="file">plain</span>    adds or fully replaces
+<span class="delete">.delete</span>  persistently masks a path</pre>
+        </article>
+      </div>
+      <div class="legend" aria-label="Repository tree legend">
+        <span style="color:#176b87">Manifest and parent pin</span>
+        <span style="color:#b6422c">Unified patch</span>
+        <span style="color:#ad7418">Tombstone</span>
+        <span style="color:#48733c">Literal object</span>
+      </div>
+    </section>
+
+    <section class="section shell reveal" id="provenance">
+      <div class="section-heading">
+        <span class="section-index">05 / Origin</span>
+        <div>
+          <h2>Every effective line answers: "why is this here?"</h2>
+          <p class="section-intro">The primary marker names the layer supplying effective content. A separate marker shows when that content overrides something lower in the stack.</p>
+        </div>
+      </div>
+
+      <div class="provenance-demo">
+        <aside class="provenance-copy">
+          <h3>A composed `.gitconfig`, viewed as ownership.</h3>
+          <p>The file itself is ordinary text. Provenance is derived from the base, each overlay transformation, and current target differences.</p>
+          <dl>
+            <dt style="color:var(--base)">Base</dt>
+            <dd>Effective content comes unchanged from the public repository.</dd>
+            <dt style="color:var(--overlay)">Work + override</dt>
+            <dd>The private overlay supplies this value in place of lower content.</dd>
+            <dt style="color:var(--stage)">Unassigned</dt>
+            <dd>The target differs from the composed stack and still needs a destination.</dd>
+          </dl>
+        </aside>
+        <div class="editor" aria-label="Example line provenance">
+          <div class="editor-bar"><i></i><i></i><i></i><span>~/.gitconfig - composed target</span></div>
+          <div class="code-line base-line"><span class="owner">base</span><i class="gutter"></i><span class="line-number">1</span><span class="code">[user]</span></div>
+          <div class="code-line base-line"><span class="owner">base</span><i class="gutter"></i><span class="line-number">2</span><span class="code">    name = Steve</span></div>
+          <div class="code-line overlay-line"><span class="owner">work</span><i class="gutter"></i><span class="line-number">3</span><span class="code">    email = steve@company.example  <span class="override-mark">! overrides base</span></span></div>
+          <div class="code-line base-line"><span class="owner">base</span><i class="gutter"></i><span class="line-number">4</span><span class="code"></span></div>
+          <div class="code-line base-line"><span class="owner">base</span><i class="gutter"></i><span class="line-number">5</span><span class="code">[core]</span></div>
+          <div class="code-line base-line"><span class="owner">base</span><i class="gutter"></i><span class="line-number">6</span><span class="code">    editor = nvim</span></div>
+          <div class="code-line unassigned-line"><span class="owner">new</span><i class="gutter"></i><span class="line-number">7</span><span class="code">    pager = delta</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section shell reveal" id="rebasing">
+      <div class="section-heading">
+        <span class="section-index">06 / Rebase</span>
+        <div>
+          <h2>A patch is a snapshot difference, not a forever instruction.</h2>
+          <p class="section-intro">When the public base moves, Layerdots uses the old pinned composition as a real merge base rather than hoping line numbers still match.</p>
+        </div>
+      </div>
+
+      <div class="merge-panel">
+        <div class="merge-diagram">
+          <article class="merge-box old"><span class="tag">Merge base</span><strong>Old public base</strong><p>The exact commit recorded by the overlay.</p></article>
+          <div class="arrow" aria-hidden="true">--&gt;</div>
+          <article class="merge-box upper"><span class="tag">Our change</span><strong>Old work result</strong><p>What the private overlay intentionally changed.</p></article>
+        </div>
+        <div class="merge-down"><span>|<br>v</span><span></span><span>|<br>v</span></div>
+        <div class="merge-diagram">
+          <article class="merge-box new"><span class="tag">New parent</span><strong>Updated public base</strong><p>New non-conflicting public changes should appear.</p></article>
+          <div class="arrow" aria-hidden="true">--&gt;</div>
+          <article class="merge-box result"><span class="tag">Merged result</span><strong>New work result</strong><p>The overlay patch is regenerated against the new pin.</p></article>
+        </div>
+        <p class="merge-caption">If both sides changed the same region, conflict files go to an isolated workspace. The last valid home configuration remains live until resolution.</p>
+      </div>
+    </section>
+
+    <section class="section shell reveal" id="rules">
+      <div class="section-heading">
+        <span class="section-index">07 / Rules</span>
+        <div>
+          <h2>The boundaries that keep composition safe.</h2>
+          <p class="section-intro">Layerdots is intentionally narrower than a general configuration generator.</p>
+        </div>
+      </div>
+
+      <div class="rules">
+        <article class="rule-card"><span class="rule-number">01</span><h3>Explicit paths only</h3><p>Unmanaged files and sibling paths are never changed by composition or apply.</p></article>
+        <article class="rule-card"><span class="rule-number">02</span><h3>No private descent</h3><p>Overlay content enters a public lower layer only through an explicit assignment.</p></article>
+        <article class="rule-card"><span class="rule-number">03</span><h3>Review before durability</h3><p>Assignments, rebases, and target transitions enter a staged transaction before commit, push, or apply.</p></article>
+        <article class="rule-card"><span class="rule-number">04</span><h3>Journal every apply</h3><p>Multi-file target writes roll back if any operation fails halfway through.</p></article>
+        <article class="rule-card"><span class="rule-number">05</span><h3>Git remains Git</h3><p>System Git supplies authentication, hooks, signing, patching, merges, and remote transport.</p></article>
+        <article class="rule-card"><span class="rule-number">06</span><h3>One stack per target</h3><p>Competing stacks cannot claim the same home directory and recreate ambiguous ownership.</p></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="shell">
+    <div>
+      <strong>Build the composition engine first.</strong>
+      <p>The first vertical slice proves composition, provenance, whole-hunk assignment, and three-way overlay rebasing before remote lifecycle or TUI work begins.</p>
+    </div>
+    <code>CONTEXT.md / PLAN.md / docs/adr/</code>
+  </footer>
+
+  <script>
+    const steps = [
+      {
+        title: "Start from the private top layer.",
+        description: "Layerdots clones the work overlay, reads its pinned parent, then recursively fetches the public base. One top-layer URL discovers the complete stack.",
+        changes: "Remote repositories are copied into managed local clones. Home is untouched until composition is reviewed and applied.",
+        active: ["remote", "clones"]
+      },
+      {
+        title: "Calculate one effective filesystem.",
+        description: "The base tree is read first. Overlay additions, replacements, patches, and tombstones are applied in order. The result is computed before live files change.",
+        changes: "Derived state gains a candidate composition. Repositories and home remain unchanged.",
+        active: ["clones", "stage"]
+      },
+      {
+        title: "Edit the files programs already use.",
+        description: "You edit ~/.gitconfig or any other managed target path normally. Layerdots compares it with the last applied composition and calls the difference unassigned.",
+        changes: "Only the target changes. No repository owns the new hunk yet.",
+        active: ["stage", "home"]
+      },
+      {
+        title: "Route intent to the right authority.",
+        description: "Choose a whole hunk and assign it to the public base or private overlay. Lower-layer assignment regenerates affected upper patches so the effective home result stays the same.",
+        changes: "A staged transaction records proposed repository changes. Nothing has been pushed, and home content does not jump.",
+        active: ["clones", "stage", "home"]
+      },
+      {
+        title: "Reconcile changes from another machine.",
+        description: "Fetched parent changes are merged using the old pinned composition. Current home edits use the last applied composition as their own merge base.",
+        changes: "Clean results enter staging. Conflicts enter an isolated workspace; live home files remain on the last valid state.",
+        active: ["remote", "clones", "stage", "home"]
+      },
+      {
+        title: "Commit and push from the bottom up.",
+        description: "After review, Layerdots commits the base first, updates overlay parent pins, then commits overlays. An explicit push publishes in the same dependency order.",
+        changes: "Remote base history advances before any overlay that depends on it. A failed parent push stops all child pushes.",
+        active: ["remote", "clones"]
+      }
+    ];
+
+    const tabs = [...document.querySelectorAll(".step-tab")];
+    const nodes = [...document.querySelectorAll(".flow-node")];
+    const kicker = document.querySelector("#step-kicker");
+    const title = document.querySelector("#step-title");
+    const description = document.querySelector("#step-description");
+    const changes = document.querySelector("#step-changes");
+
+    function selectStep(index) {
+      const step = steps[index];
+      tabs.forEach((tab, tabIndex) => tab.setAttribute("aria-selected", String(tabIndex === index)));
+      nodes.forEach((node) => {
+        const isActive = step.active.includes(node.dataset.node);
+        node.classList.toggle("is-active", isActive);
+        node.classList.toggle("is-muted", !isActive);
+      });
+      kicker.textContent = `Step ${String(index + 1).padStart(2, "0")}`;
+      title.textContent = step.title;
+      description.textContent = step.description;
+      changes.textContent = step.changes;
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => selectStep(index));
+      tab.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        const direction = event.key === "ArrowRight" ? 1 : -1;
+        const next = (index + direction + tabs.length) % tabs.length;
+        tabs[next].focus();
+        selectStep(next);
+      });
+    });
+
+    selectStep(0);
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll(".reveal").forEach((element) => observer.observe(element));
+  </script>
+</body>
+</html>
