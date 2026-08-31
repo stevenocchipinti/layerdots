@@ -5,9 +5,9 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 1, Core Vertical Slice
-- Active step: shared domain contracts
-- Last verified commit: none yet
-- Next step: define shared domain contracts, then delegate manifest, Git fixture, and filesystem packages
+- Active step: composition engine
+- Last verified integration: repository contracts, validation, Git fixtures, and tree loading
+- Next step: implement deterministic composition for additions, replacements, patches, and tombstones
 
 ## Safety Boundary
 
@@ -35,9 +35,9 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ### Milestone 1: Core Vertical Slice
 
 - [x] Scaffold TypeScript CLI and automated verification.
-- [ ] Define and validate manifest version 1.
-- [ ] Build isolated committed Git fixtures.
-- [ ] Read repository filesystem objects without losing bytes or metadata.
+- [x] Define and validate manifest version 1.
+- [x] Build isolated committed Git fixtures.
+- [x] Read repository filesystem objects without losing bytes or metadata.
 - [ ] Compose additions, replacements, patches, and tombstones.
 - [ ] Produce status and colored diffs.
 - [ ] Calculate file and line provenance.
@@ -49,6 +49,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Verification Log
 
 - Foundation gate: `corepack pnpm verify` passed on 2026-09-01 with 1 test.
+- Repository integration gate: `corepack pnpm verify` passed on 2026-09-01 with 33 tests after independent safety review.
 
 ## Resume Checklist
 
