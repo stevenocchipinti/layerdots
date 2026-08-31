@@ -5,9 +5,9 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 1, Core Vertical Slice
-- Active step: composition engine
-- Last verified integration: repository contracts, validation, Git fixtures, and tree loading
-- Next step: implement deterministic composition for additions, replacements, patches, and tombstones
+- Active step: repository loading and CLI status/diff
+- Last verified integration: deterministic composition and strict unified patch application
+- Next step: load snapshots from local repositories and expose managed-path status and colored diffs
 
 ## Safety Boundary
 
@@ -38,7 +38,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Define and validate manifest version 1.
 - [x] Build isolated committed Git fixtures.
 - [x] Read repository filesystem objects without losing bytes or metadata.
-- [ ] Compose additions, replacements, patches, and tombstones.
+- [x] Compose additions, replacements, patches, and tombstones.
 - [ ] Produce status and colored diffs.
 - [ ] Calculate file and line provenance.
 - [ ] Detect unassigned target changes.
@@ -50,6 +50,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 
 - Foundation gate: `corepack pnpm verify` passed on 2026-09-01 with 1 test.
 - Repository integration gate: `corepack pnpm verify` passed on 2026-09-01 with 33 tests after independent safety review.
+- Composition gate: `corepack pnpm verify` passed on 2026-09-01 with 43 tests after strict patch-semantics review.
 
 ## Resume Checklist
 
