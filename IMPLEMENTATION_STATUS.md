@@ -5,9 +5,9 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 1, Core Vertical Slice
-- Active step: whole-hunk assignment
-- Last verified integration: file/line provenance and unassigned-change detection
-- Next step: assign selected target hunks to base or overlay while preserving effective composed bytes
+- Active step: overlay rebase and conflict isolation
+- Last verified integration: privacy-preserving whole-hunk assignment
+- Next step: merge overlay changes onto an advanced parent, regenerate representations, and isolate conflicts
 
 ## Safety Boundary
 
@@ -42,7 +42,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Produce status and colored diffs.
 - [x] Calculate file and line provenance.
 - [x] Detect unassigned target changes.
-- [ ] Assign whole hunks while preserving effective bytes.
+- [x] Assign whole hunks while preserving effective bytes.
 - [ ] Rebase overlays with isolated conflicts.
 - [ ] Pass the complete acceptance fixture.
 
@@ -53,6 +53,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Composition gate: `corepack pnpm verify` passed on 2026-09-01 with 43 tests after strict patch-semantics review.
 - Inspection gate: `corepack pnpm verify` passed on 2026-09-01 with 55 tests after insertion-aware diff review.
 - Provenance gate: `corepack pnpm verify` passed on 2026-09-01 with 71 tests after ambiguity and assignment-range review.
+- Assignment gate: `corepack pnpm verify` passed on 2026-09-01 with 106 tests after adversarial privacy and malformed-hunk review.
 
 ## Resume Checklist
 
