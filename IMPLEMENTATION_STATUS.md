@@ -5,9 +5,9 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 1, Core Vertical Slice
-- Active step: repository loading and CLI status/diff
-- Last verified integration: deterministic composition and strict unified patch application
-- Next step: load snapshots from local repositories and expose managed-path status and colored diffs
+- Active step: file and line provenance
+- Last verified integration: stable local snapshots and managed status/diff rendering
+- Next step: calculate effective ownership, overrides, ambiguity, and unassigned target changes
 
 ## Safety Boundary
 
@@ -39,7 +39,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Build isolated committed Git fixtures.
 - [x] Read repository filesystem objects without losing bytes or metadata.
 - [x] Compose additions, replacements, patches, and tombstones.
-- [ ] Produce status and colored diffs.
+- [x] Produce status and colored diffs.
 - [ ] Calculate file and line provenance.
 - [ ] Detect unassigned target changes.
 - [ ] Assign whole hunks while preserving effective bytes.
@@ -51,6 +51,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Foundation gate: `corepack pnpm verify` passed on 2026-09-01 with 1 test.
 - Repository integration gate: `corepack pnpm verify` passed on 2026-09-01 with 33 tests after independent safety review.
 - Composition gate: `corepack pnpm verify` passed on 2026-09-01 with 43 tests after strict patch-semantics review.
+- Inspection gate: `corepack pnpm verify` passed on 2026-09-01 with 55 tests after insertion-aware diff review.
 
 ## Resume Checklist
 
