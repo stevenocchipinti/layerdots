@@ -5,9 +5,9 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 1, Core Vertical Slice
-- Active step: file and line provenance
-- Last verified integration: stable local snapshots and managed status/diff rendering
-- Next step: calculate effective ownership, overrides, ambiguity, and unassigned target changes
+- Active step: whole-hunk assignment
+- Last verified integration: file/line provenance and unassigned-change detection
+- Next step: assign selected target hunks to base or overlay while preserving effective composed bytes
 
 ## Safety Boundary
 
@@ -40,8 +40,8 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Read repository filesystem objects without losing bytes or metadata.
 - [x] Compose additions, replacements, patches, and tombstones.
 - [x] Produce status and colored diffs.
-- [ ] Calculate file and line provenance.
-- [ ] Detect unassigned target changes.
+- [x] Calculate file and line provenance.
+- [x] Detect unassigned target changes.
 - [ ] Assign whole hunks while preserving effective bytes.
 - [ ] Rebase overlays with isolated conflicts.
 - [ ] Pass the complete acceptance fixture.
@@ -52,6 +52,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Repository integration gate: `corepack pnpm verify` passed on 2026-09-01 with 33 tests after independent safety review.
 - Composition gate: `corepack pnpm verify` passed on 2026-09-01 with 43 tests after strict patch-semantics review.
 - Inspection gate: `corepack pnpm verify` passed on 2026-09-01 with 55 tests after insertion-aware diff review.
+- Provenance gate: `corepack pnpm verify` passed on 2026-09-01 with 71 tests after ambiguity and assignment-range review.
 
 ## Resume Checklist
 
