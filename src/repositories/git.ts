@@ -4,7 +4,7 @@ import { LayerdotsError } from '../domain/errors.js';
 
 export interface GitOptions {
   readonly cwd?: string;
-  readonly env?: NodeJS.ProcessEnv;
+  readonly env: NodeJS.ProcessEnv;
 }
 
 export interface GitResult {
@@ -17,12 +17,20 @@ export type GitCommandError = LayerdotsError & GitResult;
 
 export async function runGit(
   args: readonly string[],
-  options: GitOptions = {},
+  options: GitOptions,
 ): Promise<GitResult> {
+  // Keep the runtime boundary safe for untyped JavaScript callers too.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (options.env === undefined) {
+    throw new LayerdotsError(
+      'Git commands require an explicit isolated environment.',
+      'git_environment_required',
+    );
+  }
   return new Promise((resolve, reject) => {
     const child = spawn('git', [...args], {
       cwd: options.cwd,
-      env: options.env === undefined ? process.env : options.env,
+      env: options.env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const stdout: Buffer[] = [];

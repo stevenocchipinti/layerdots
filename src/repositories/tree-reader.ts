@@ -123,6 +123,91 @@ export async function readRepositoryTree(
   return objects;
 }
 
+/** Read only explicitly managed paths from a target-shaped home tree. */
+export async function readManagedPaths(
+  targetRoot: string,
+  paths: Iterable<ManagedPath>,
+): Promise<ReadonlyMap<ManagedPath, ManagedObject>> {
+  const home = join(targetRoot, 'home');
+  const homeStats = await lstat(home).catch((error: unknown) => {
+    throw repositoryError(`Cannot read target home tree: ${home}`, error);
+  });
+  if (!homeStats.isDirectory() || homeStats.isSymbolicLink()) {
+    throw new LayerdotsError(
+      `Target home is not a real directory: ${home}`,
+      'invalid-home-tree',
+    );
+  }
+
+  const objects = new Map<ManagedPath, ManagedObject>();
+  for (const candidate of [...paths].sort()) {
+    const path = validateManagedPath(candidate);
+    const components = path.split('/');
+    let current = home;
+    let missing = false;
+    for (const [index, component] of components.entries()) {
+      current = join(current, component);
+      let stats;
+      try {
+        stats = await lstat(current);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          missing = true;
+          break;
+        }
+        throw repositoryError(
+          `Cannot inspect managed target path: ${current}`,
+          error,
+        );
+      }
+      const leaf = index === components.length - 1;
+      if (!leaf) {
+        if (!stats.isDirectory() || stats.isSymbolicLink()) {
+          throw new LayerdotsError(
+            `Managed target parent is not a real directory: ${current}`,
+            'target-symlink-parent',
+          );
+        }
+        continue;
+      }
+      if (stats.isSymbolicLink()) {
+        objects.set(path, {
+          kind: 'symlink',
+          target: await readlink(current, 'utf8'),
+        });
+      } else if (stats.isFile()) {
+        const handle = await open(
+          current,
+          constants.O_RDONLY | constants.O_NOFOLLOW,
+        );
+        try {
+          const opened = await handle.stat();
+          if (!opened.isFile() || opened.nlink > 1) {
+            throw new LayerdotsError(
+              `Unsupported managed target object: ${path}`,
+              'unsupported-object',
+            );
+          }
+          objects.set(path, {
+            kind: 'file',
+            content: await handle.readFile(),
+            executable: (opened.mode & 0o111) !== 0,
+          });
+        } finally {
+          await handle.close();
+        }
+      } else {
+        throw new LayerdotsError(
+          `Unsupported managed target object: ${path}`,
+          'unsupported-object',
+        );
+      }
+    }
+    if (missing) continue;
+  }
+  return objects;
+}
+
 function repositoryError(message: string, cause: unknown): LayerdotsError {
   return new LayerdotsError(message, 'repository-read-failed', {
     cause: cause instanceof Error ? cause : undefined,

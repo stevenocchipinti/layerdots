@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   classifyFileContent,
+  readManagedPaths,
   readRepositoryTree,
 } from '../../src/repositories/tree-reader.js';
 import { createSandbox } from '../support/sandbox.js';
@@ -70,5 +71,29 @@ describe('readRepositoryTree', () => {
       target: 'outside',
     });
     expect(objects.has('linked/secret')).toBe(false);
+  });
+
+  it('reads only requested managed target paths and ignores unmanaged objects', async () => {
+    const root = await createSandbox('managed-target');
+    await mkdir(join(root, 'home', 'managed'), { recursive: true });
+    await mkdir(join(root, 'home', 'unmanaged-empty'));
+    await writeFile(join(root, 'home', 'managed', 'config'), 'value');
+    await writeFile(join(root, 'home', 'unmanaged'), 'leave me alone');
+
+    const objects = await readManagedPaths(root, ['managed/config', 'missing']);
+
+    expect([...objects.keys()]).toEqual(['managed/config']);
+    expect(objects.has('unmanaged')).toBe(false);
+  });
+
+  it('rejects symlinked parents of managed target paths', async () => {
+    const root = await createSandbox('managed-target-link');
+    await mkdir(join(root, 'home', 'real'), { recursive: true });
+    await writeFile(join(root, 'home', 'real', 'config'), 'value');
+    await symlink('real', join(root, 'home', 'linked'));
+
+    await expect(
+      readManagedPaths(root, ['linked/config']),
+    ).rejects.toMatchObject({ code: 'target-symlink-parent' });
   });
 });

@@ -4,10 +4,10 @@ This file is the handoff ledger for implementation work. Update it after each ve
 
 ## Current Position
 
-- Active milestone: Milestone 1, Core Vertical Slice
-- Active step: end-to-end CLI acceptance fixture
-- Last verified integration: three-way overlay rebase and atomic conflict isolation
-- Next step: wire local compose/status/provenance commands and pass the complete Milestone 1 scenario
+- Active milestone: Milestone 2, Safe Target Application
+- Active step: not started
+- Last verified integration: Milestone 1 core vertical slice and acceptance fixture
+- Next step: design applied-state and journal contracts before implementing any target writes
 
 ## Safety Boundary
 
@@ -44,7 +44,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Detect unassigned target changes.
 - [x] Assign whole hunks while preserving effective bytes.
 - [x] Rebase overlays with isolated conflicts.
-- [ ] Pass the complete acceptance fixture.
+- [x] Pass the complete acceptance fixture.
 
 ## Verification Log
 
@@ -55,6 +55,13 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Provenance gate: `corepack pnpm verify` passed on 2026-09-01 with 71 tests after ambiguity and assignment-range review.
 - Assignment gate: `corepack pnpm verify` passed on 2026-09-01 with 106 tests after adversarial privacy and malformed-hunk review.
 - Synchronization gate: `corepack pnpm verify` passed on 2026-09-01 with 130 tests after diff3-boundary and workspace-safety review.
+- Milestone 1 acceptance gate: `corepack pnpm verify` passed on 2026-09-01 with 143 tests after independent correctness and actual-home safety audits.
+
+## Milestone 1 Limitations
+
+- `inspect` is the only exposed CLI workflow; assignment and rebase are core APIs pending transaction command design.
+- Real remotes, commits, pushes, target application, applied-state persistence, and rollback remain deliberately out of scope.
+- Portable Node filesystem APIs cannot eliminate every concurrent symlink replacement race; static symlinks are rejected and file leaves use no-follow opens.
 
 ## Resume Checklist
 

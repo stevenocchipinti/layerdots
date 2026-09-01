@@ -11,6 +11,14 @@ import {
 } from '../support/sandbox.js';
 
 describe('system Git adapter', () => {
+  it('rejects a missing explicit environment at runtime', async () => {
+    await expect(
+      runGit(['--version'], { env: undefined } as unknown as {
+        env: NodeJS.ProcessEnv;
+      }),
+    ).rejects.toMatchObject({ code: 'git_environment_required' });
+  });
+
   it('creates a clean committed fixture and returns HEAD', async () => {
     const fixture = await createGitFixture({
       files: { 'home/.gitconfig': '[user]\n', 'bin/tool': '#!/bin/sh\n' },
