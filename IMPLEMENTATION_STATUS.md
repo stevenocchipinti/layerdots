@@ -5,9 +5,9 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 1, Core Vertical Slice
-- Active step: overlay rebase and conflict isolation
-- Last verified integration: privacy-preserving whole-hunk assignment
-- Next step: merge overlay changes onto an advanced parent, regenerate representations, and isolate conflicts
+- Active step: end-to-end CLI acceptance fixture
+- Last verified integration: three-way overlay rebase and atomic conflict isolation
+- Next step: wire local compose/status/provenance commands and pass the complete Milestone 1 scenario
 
 ## Safety Boundary
 
@@ -43,7 +43,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Calculate file and line provenance.
 - [x] Detect unassigned target changes.
 - [x] Assign whole hunks while preserving effective bytes.
-- [ ] Rebase overlays with isolated conflicts.
+- [x] Rebase overlays with isolated conflicts.
 - [ ] Pass the complete acceptance fixture.
 
 ## Verification Log
@@ -54,6 +54,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Inspection gate: `corepack pnpm verify` passed on 2026-09-01 with 55 tests after insertion-aware diff review.
 - Provenance gate: `corepack pnpm verify` passed on 2026-09-01 with 71 tests after ambiguity and assignment-range review.
 - Assignment gate: `corepack pnpm verify` passed on 2026-09-01 with 106 tests after adversarial privacy and malformed-hunk review.
+- Synchronization gate: `corepack pnpm verify` passed on 2026-09-01 with 130 tests after diff3-boundary and workspace-safety review.
 
 ## Resume Checklist
 
