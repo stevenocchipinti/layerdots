@@ -17,17 +17,17 @@ Prove that a public base and private overlay can be composed, inspected, changed
 
 ### Scope
 
-1. Scaffold a TypeScript CLI with automated tests.
-2. Define and validate version 1 of `layerdots.json`.
-3. Load local fixture repositories representing one base and one overlay.
-4. Compose plain files, full replacements, unified patches, and tombstones.
-5. Classify valid UTF-8 text and opaque binary files.
-6. Produce managed-path status and colored diffs.
-7. Calculate file and line provenance, including overrides and ambiguity.
-8. Detect unassigned target changes.
-9. Assign whole hunks to the base or overlay.
-10. Rebase an overlay after its parent advances using a three-way merge.
-11. Place unresolved conflicts in an isolated workspace.
+1. [x] Scaffold a TypeScript CLI with automated tests.
+2. [x] Define and validate version 1 of `layerdots.json`.
+3. [x] Load local fixture repositories representing one base and one overlay.
+4. [x] Compose plain files, full replacements, unified patches, and tombstones.
+5. [x] Classify valid UTF-8 text and opaque binary files.
+6. [x] Produce managed-path status and colored diffs.
+7. [x] Calculate file and line provenance, including overrides and ambiguity.
+8. [x] Detect unassigned target changes.
+9. [x] Assign whole hunks to the base or overlay.
+10. [x] Rebase an overlay after its parent advances using a three-way merge.
+11. [x] Place unresolved conflicts in an isolated workspace.
 
 ### Acceptance Fixture
 
