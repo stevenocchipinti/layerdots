@@ -5,16 +5,16 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 2, Safe Target Application
-- Active step: not started
-- Last verified integration: Milestone 1 core vertical slice and acceptance fixture
-- Next step: design applied-state and journal contracts before implementing any target writes
+- Active step: complete
+- Last verified integration: Milestone 2 safe target application, CLI apply command, guarded home resolution, and add/delete/unmanage workflows
+- Next step: Milestone 3, Repository Lifecycle
 
 ## Safety Boundary
 
 - Development fixtures, Git repositories, targets, state, cache, and conflict workspaces must live under the ignored `.layerdots-dev/` directory.
 - Tests must replace `HOME`, XDG variables, and Git configuration with sandbox-local values before invoking Layerdots or Git.
 - Development and test commands must never use the actual user home directory as a target.
-- Milestone 2 must add an explicit target-root guard before any general target-writing command is exercised.
+- `applyComposition` requires an explicit `targetRoot` and never defaults to or writes the user's home directory. The `apply` CLI targets the real home only when both `--apply-to-home` and `LAYERDOTS_ALLOW_HOME=1` are set; development and tests remain sandbox-forced and never use a real home.
 
 ## Decisions
 
@@ -46,6 +46,19 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Rebase overlays with isolated conflicts.
 - [x] Pass the complete acceptance fixture.
 
+### Milestone 2: Safe Target Application
+
+- [x] Define applied-state, journal, and apply contracts (`src/apply/types.ts`).
+- [x] Persist and reload the last applied composition (with explicit-deleted set) atomically and safely (`src/apply/state.ts`).
+- [x] Capture target before-images and roll back on apply failure, pruning only apply-created parents (`src/apply/journal.ts`).
+- [x] Orchestrate safe target application (`src/apply/apply.ts`): three-way merge against the applied-state base, isolated conflicts, path/case/symlink validation, type-replacement approval, journaled rollback, unmanaged-sibling preservation, and applied-state persistence after successful writes.
+- [x] Harden with property, security, and fidelity tests (executable bits, CRLF, missing final newlines, binaries, idempotence, escape rejection, approval matrix, rollback, applied-state/target consistency).
+- [x] Pass the Milestone 2 acceptance fixture with real Git layer repositories.
+- [x] Expose target application through an `apply` CLI command (`src/cli/apply.ts`, `src/cli/main.ts`).
+- [x] Resolve a default home target behind an explicit `--apply-to-home` flag AND the `LAYERDOTS_ALLOW_HOME=1` environment guard (`src/cli/target.ts`).
+- [x] Implement distinct add, delete, and unmanage workflows (`src/assignment/workflows.ts`).
+- [x] Pass the full verification gate at 278 tests.
+
 ## Verification Log
 
 - Foundation gate: `corepack pnpm verify` passed on 2026-09-01 with 1 test.
@@ -56,11 +69,26 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Assignment gate: `corepack pnpm verify` passed on 2026-09-01 with 106 tests after adversarial privacy and malformed-hunk review.
 - Synchronization gate: `corepack pnpm verify` passed on 2026-09-01 with 130 tests after diff3-boundary and workspace-safety review.
 - Milestone 1 acceptance gate: `corepack pnpm verify` passed on 2026-09-01 with 143 tests after independent correctness and actual-home safety audits.
+- Applied-state and journal gate: `corepack pnpm verify` passed on 2026-09-07 with 205 tests.
+- Target application gate: `corepack pnpm verify` passed on 2026-09-07 with 217 tests after safety and merge-base review.
+- Hardening gate: `corepack pnpm verify` passed on 2026-09-07 with 239 tests after fidelity, escaping, and approval-matrix review.
+- Milestone 2 acceptance gate: `corepack pnpm verify` passed on 2026-09-07 with 240 tests.
+- Apply CLI gate: `corepack pnpm verify` passed on 2026-09-07 with 247 tests.
+- Guarded home-target gate: `corepack pnpm verify` passed on 2026-09-07 with 254 tests after double-opt-in opt-out audit.
+- Workflows gate: `corepack pnpm verify` passed on 2026-09-07 with 278 tests after byte-preservation and regeneration review.
+- Milestone 2 completion gate: `corepack pnpm verify` passed on 2026-09-07 with 278 tests after CLI, home-guard, and workflows review.
+
+## Milestone 2 Limitations
+
+- The `apply` CLI writes state under `<cwd>/.layerdots` and does not yet relocate state/configuration to XDG directories (Milestone 3).
+- Real-home writes are reachable only behind the double opt-in (`--apply-to-home` + `LAYERDOTS_ALLOW_HOME=1`) and have not been exercised against an actual real home by the test suite.
+- Add, delete, and unmanage workflows are core data operations, not yet surfaced as distinct user-facing CLI commands, and are not wired into a staged transaction (Milestone 4).
+- A managed path that currently resolves to a directory on the target is rejected as `unsupported-object` by the target reader before type-replacement approval logic runs, so directory-to-file replacement is not reachable in the current version.
 
 ## Milestone 1 Limitations
 
-- `inspect` is the only exposed CLI workflow; assignment and rebase are core APIs pending transaction command design.
-- Real remotes, commits, pushes, target application, applied-state persistence, and rollback remain deliberately out of scope.
+- `inspect` and `apply` are the only exposed CLI workflows; assignment, rebase, and add/delete/unmanage are core APIs pending transaction command design.
+- Real remotes, commits, and pushes through system Git remain deliberately out of scope (Milestone 3).
 - Portable Node filesystem APIs cannot eliminate every concurrent symlink replacement race; static symlinks are rejected and file leaves use no-follow opens.
 
 ## Resume Checklist
