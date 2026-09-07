@@ -5,16 +5,16 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 2, Safe Target Application
-- Active step: core apply modules complete; CLI exposure and remaining workflows pending (see Milestone 2 status below)
-- Last verified integration: Milestone 2 core apply vertical slice and acceptance fixture
-- Next step: expose target application through a CLI command, then complete the remaining Milestone 2 workflows (explicit home-default resolution and add/delete/unmanage)
+- Active step: complete
+- Last verified integration: Milestone 2 safe target application, CLI apply command, guarded home resolution, and add/delete/unmanage workflows
+- Next step: Milestone 3, Repository Lifecycle
 
 ## Safety Boundary
 
 - Development fixtures, Git repositories, targets, state, cache, and conflict workspaces must live under the ignored `.layerdots-dev/` directory.
 - Tests must replace `HOME`, XDG variables, and Git configuration with sandbox-local values before invoking Layerdots or Git.
 - Development and test commands must never use the actual user home directory as a target.
-- `applyComposition` requires an explicit `targetRoot` and never defaults to or writes the user's home directory. A CLI that resolves a default home target must add an explicit target-root guard and remain sandbox-forced in development before any general target-writing command is exercised.
+- `applyComposition` requires an explicit `targetRoot` and never defaults to or writes the user's home directory. The `apply` CLI targets the real home only when both `--apply-to-home` and `LAYERDOTS_ALLOW_HOME=1` are set; development and tests remain sandbox-forced and never use a real home.
 
 ## Decisions
 
@@ -54,9 +54,10 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Orchestrate safe target application (`src/apply/apply.ts`): three-way merge against the applied-state base, isolated conflicts, path/case/symlink validation, type-replacement approval, journaled rollback, unmanaged-sibling preservation, and applied-state persistence after successful writes.
 - [x] Harden with property, security, and fidelity tests (executable bits, CRLF, missing final newlines, binaries, idempotence, escape rejection, approval matrix, rollback, applied-state/target consistency).
 - [x] Pass the Milestone 2 acceptance fixture with real Git layer repositories.
-- [ ] Expose target application through a CLI command.
-- [ ] Resolve a default home target with an explicit target-root guard.
-- [ ] Implement distinct add, delete, and unmanage workflows.
+- [x] Expose target application through an `apply` CLI command (`src/cli/apply.ts`, `src/cli/main.ts`).
+- [x] Resolve a default home target behind an explicit `--apply-to-home` flag AND the `LAYERDOTS_ALLOW_HOME=1` environment guard (`src/cli/target.ts`).
+- [x] Implement distinct add, delete, and unmanage workflows (`src/assignment/workflows.ts`).
+- [x] Pass the full verification gate at 278 tests.
 
 ## Verification Log
 
@@ -72,15 +73,21 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Target application gate: `corepack pnpm verify` passed on 2026-09-07 with 217 tests after safety and merge-base review.
 - Hardening gate: `corepack pnpm verify` passed on 2026-09-07 with 239 tests after fidelity, escaping, and approval-matrix review.
 - Milestone 2 acceptance gate: `corepack pnpm verify` passed on 2026-09-07 with 240 tests.
+- Apply CLI gate: `corepack pnpm verify` passed on 2026-09-07 with 247 tests.
+- Guarded home-target gate: `corepack pnpm verify` passed on 2026-09-07 with 254 tests after double-opt-in opt-out audit.
+- Workflows gate: `corepack pnpm verify` passed on 2026-09-07 with 278 tests after byte-preservation and regeneration review.
+- Milestone 2 completion gate: `corepack pnpm verify` passed on 2026-09-07 with 278 tests after CLI, home-guard, and workflows review.
 
 ## Milestone 2 Limitations
 
-- Target application is exposed only through the `applyComposition` core API; there is no CLI command yet.
-- `applyComposition` requires an explicit `targetRoot`; home-directory defaulting and the target-root guard are not yet implemented.
-- Add, delete, and unmanage workflows exist only at the data level; they are not surfaced as distinct user commands.
+- The `apply` CLI writes state under `<cwd>/.layerdots` and does not yet relocate state/configuration to XDG directories (Milestone 3).
+- Real-home writes are reachable only behind the double opt-in (`--apply-to-home` + `LAYERDOTS_ALLOW_HOME=1`) and have not been exercised against an actual real home by the test suite.
+- Add, delete, and unmanage workflows are core data operations, not yet surfaced as distinct user-facing CLI commands, and are not wired into a staged transaction (Milestone 4).
 - A managed path that currently resolves to a directory on the target is rejected as `unsupported-object` by the target reader before type-replacement approval logic runs, so directory-to-file replacement is not reachable in the current version.
 
-- `inspect` is the only exposed CLI workflow; assignment and rebase are core APIs pending transaction command design.
+## Milestone 1 Limitations
+
+- `inspect` and `apply` are the only exposed CLI workflows; assignment, rebase, and add/delete/unmanage are core APIs pending transaction command design.
 - Real remotes, commits, and pushes through system Git remain deliberately out of scope (Milestone 3).
 - Portable Node filesystem APIs cannot eliminate every concurrent symlink replacement race; static symlinks are rejected and file leaves use no-follow opens.
 
