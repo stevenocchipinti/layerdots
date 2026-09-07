@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { LayerdotsError } from '../domain/errors.js';
 import { applyCommand } from './apply.js';
 import { inspect } from './inspect.js';
+import { resolveTargetPath } from './target.js';
 
 export function main(args: readonly string[]): number {
   if (args.length === 1 && args[0] === '--version') {
@@ -32,10 +33,17 @@ export async function runCli(
     }
     let output: string;
     if (args[0] === 'apply') {
-      const options = parseApply(args);
-      const withCwd =
-        io.cwd === undefined ? options : { ...options, cwd: io.cwd };
-      output = await applyCommand(withCwd);
+      const parsed = parseApply(args);
+      const cwd = io.cwd ?? process.cwd();
+      const target: string = resolveTargetPath({
+        cwd,
+        ...(parsed.target !== undefined
+          ? { explicitTarget: parsed.target }
+          : {}),
+        useHome: parsed.applyToHome,
+      });
+      const options = { ...parsed, target, cwd };
+      output = await applyCommand(options);
     } else {
       const options = parseInspect(args);
       output = await inspect(
@@ -101,7 +109,8 @@ function parseInspect(args: readonly string[]): ParsedInspect {
 interface ParsedApply {
   readonly base: string;
   readonly overlays: string[];
-  readonly target: string;
+  readonly target?: string;
+  readonly applyToHome: boolean;
   readonly stateDir?: string;
   readonly approve: string[];
 }
@@ -111,6 +120,7 @@ function parseApply(args: readonly string[]): ParsedApply {
     throw new LayerdotsError('Expected apply command.', 'CLI_USAGE');
   let base: string | undefined;
   let target: string | undefined;
+  let applyToHome = false;
   let stateDir: string | undefined;
   const overlays: string[] = [];
   const approve: string[] = [];
@@ -123,6 +133,13 @@ function parseApply(args: readonly string[]): ParsedApply {
         throw new LayerdotsError(`Missing value for ${flag}.`, 'CLI_USAGE');
       if (flag === '--overlay') overlays.push(value);
       else approve.push(value);
+      continue;
+    }
+    if (flag === '--apply-to-home') {
+      if (seen.has(flag))
+        throw new LayerdotsError(`Duplicate argument: ${flag}.`, 'CLI_USAGE');
+      seen.add(flag);
+      applyToHome = true;
       continue;
     }
     if (flag !== '--base' && flag !== '--target' && flag !== '--state-dir') {
@@ -139,13 +156,18 @@ function parseApply(args: readonly string[]): ParsedApply {
     else stateDir = value;
   }
   if (!base) throw new LayerdotsError('Missing required --base.', 'CLI_USAGE');
-  if (!target)
-    throw new LayerdotsError('Missing required --target.', 'CLI_USAGE');
+  if (target !== undefined && applyToHome) {
+    throw new LayerdotsError(
+      'Cannot use both --target and --apply-to-home.',
+      'CLI_USAGE',
+    );
+  }
   return {
     base,
     overlays,
-    target,
-    ...(stateDir ? { stateDir } : {}),
+    ...(target !== undefined ? { target } : {}),
+    applyToHome,
+    ...(stateDir !== undefined ? { stateDir } : {}),
     approve,
   };
 }

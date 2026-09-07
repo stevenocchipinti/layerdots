@@ -12,6 +12,7 @@ export interface ApplyOptions {
   readonly stateDir?: string;
   readonly approve: readonly string[];
   readonly cwd?: string;
+  readonly applyToHome?: boolean;
 }
 
 export async function applyCommand(options: ApplyOptions): Promise<string> {
