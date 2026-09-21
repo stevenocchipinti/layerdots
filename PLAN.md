@@ -63,17 +63,17 @@ The automated scenario must demonstrate:
 
 ## Milestone 3: Repository Lifecycle
 
-1. Store machine configuration, state, data, and cache in XDG locations.
-2. Refuse to manage Layerdots' own local directories.
-3. Implement tool-managed clones.
-4. Initialize recursively from a top overlay URL.
-5. Fetch tracked parent branches and exact pinned commits.
-6. Require clean repository worktrees.
-7. Stage synchronization results for review.
-8. Coordinate commits from base upward.
-9. Honor Git hooks and signing configuration.
-10. Implement explicit base-to-overlay push.
-11. Detect remote divergence and require synchronization.
+1. [x] Store machine configuration, state, data, and cache in XDG locations.
+2. [x] Refuse to manage Layerdots' own local directories.
+3. [x] Implement tool-managed clones.
+4. [x] Initialize recursively from a top overlay URL.
+5. [x] Fetch tracked parent branches and exact pinned commits.
+6. [x] Require clean repository worktrees.
+7. [x] Stage repository changes for review.
+8. [x] Coordinate commits from base upward.
+9. [x] Honor Git hooks and signing configuration.
+10. [x] Implement explicit base-to-overlay push.
+11. [x] Detect remote divergence and require synchronization.
 
 ## Milestone 4: Assignment Workflow
 

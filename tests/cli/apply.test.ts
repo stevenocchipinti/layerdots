@@ -357,7 +357,7 @@ describe('apply', () => {
     expect(await readlink(join(target, 'home/tool'))).toBe('/usr/bin/tool');
   });
 
-  it('reports CLI usage for missing base, unknown flags, and missing values', async () => {
+  it('reports active-stack, unknown-flag, and missing-value errors', async () => {
     const base = await createGitFixture({
       prefix: 'cli-apply-usage-base',
       files: {
@@ -375,7 +375,7 @@ describe('apply', () => {
       sandbox,
     );
     expect(missingBase.code).toBe(1);
-    expect(missingBase.stderr).toContain('CLI_USAGE');
+    expect(missingBase.stderr).toContain('STACK_NOT_CONFIGURED');
 
     const unknown = await runApply(
       env,
@@ -400,6 +400,14 @@ describe('apply', () => {
     );
     expect(emptyApprove.code).toBe(1);
     expect(emptyApprove.stderr).toContain('CLI_USAGE');
+
+    const managedTarget = await runApply(
+      env,
+      ['apply', '--base', base.root, '--target', join(sandbox, 'xdg/data')],
+      sandbox,
+    );
+    expect(managedTarget.code).toBe(1);
+    expect(managedTarget.stderr).toContain('TARGET_OVERLAPS_LAYERDOTS_DATA');
   });
 
   it('rejects apply without an explicit target', async () => {
