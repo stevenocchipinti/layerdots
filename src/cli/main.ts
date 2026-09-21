@@ -5,6 +5,9 @@ import { LayerdotsError } from '../domain/errors.js';
 import { applyCommand } from './apply.js';
 import { inspect } from './inspect.js';
 import { resolveTargetPath } from './target.js';
+import { initializeStack } from '../lifecycle/initialize.js';
+import { resolveLayerdotsPaths } from '../lifecycle/paths.js';
+import { readActiveStack } from '../lifecycle/stack.js';
 
 export function main(args: readonly string[]): number {
   if (args.length === 1 && args[0] === '--version') {
@@ -18,6 +21,7 @@ export interface CliIo {
   readonly stdout?: (value: string) => void;
   readonly stderr?: (value: string) => void;
   readonly cwd?: string;
+  readonly env?: NodeJS.ProcessEnv;
 }
 
 export async function runCli(
@@ -32,9 +36,31 @@ export async function runCli(
       return 0;
     }
     let output: string;
-    if (args[0] === 'apply') {
+    const cwd = io.cwd ?? process.cwd();
+    const env = io.env ?? process.env;
+    const paths = resolveLayerdotsPaths(env);
+    if (args[0] === 'init') {
+      const parsed = parseInit(args);
+      const stack = await initializeStack({
+        overlayUrl: parsed.overlayUrl,
+        target: resolveTargetPath({
+          cwd,
+          explicitTarget: parsed.target,
+          useHome: false,
+        }),
+        paths,
+        env,
+      });
+      output = [
+        `INITIALIZED TARGET ${stack.target}`,
+        ...stack.layers.map(
+          (layer) => `LAYER ${layer.root} COMMIT ${layer.commit}`,
+        ),
+      ].join('\n');
+      output = `${output}\n`;
+    } else if (args[0] === 'apply') {
       const parsed = parseApply(args);
-      const cwd = io.cwd ?? process.cwd();
+      const usesActiveStack = parsed.base === undefined;
       const target: string = resolveTargetPath({
         cwd,
         ...(parsed.target !== undefined
@@ -42,13 +68,21 @@ export async function runCli(
           : {}),
         useHome: parsed.applyToHome,
       });
-      const options = { ...parsed, target, cwd };
+      const layers = await resolveLayers(parsed, target, paths);
+      const options = {
+        ...parsed,
+        ...layers,
+        target,
+        cwd,
+        ...(parsed.stateDir === undefined && usesActiveStack
+          ? { stateDir: paths.state }
+          : {}),
+      };
       output = await applyCommand(options);
     } else {
       const options = parseInspect(args);
-      output = await inspect(
-        io.cwd === undefined ? options : { ...options, cwd: io.cwd },
-      );
+      const layers = await resolveLayers(options, options.target, paths);
+      output = await inspect({ ...options, ...layers, cwd });
     }
     stdout(output);
     return 0;
@@ -65,7 +99,7 @@ export async function runCli(
 }
 
 interface ParsedInspect {
-  readonly base: string;
+  readonly base?: string;
   readonly overlays: string[];
   readonly target?: string;
   readonly color: 'always' | 'never';
@@ -102,12 +136,22 @@ function parseInspect(args: readonly string[]): ParsedInspect {
     else if (value === 'always' || value === 'never') color = value;
     else throw new LayerdotsError(`Invalid color: ${value}.`, 'CLI_USAGE');
   }
-  if (!base) throw new LayerdotsError('Missing required --base.', 'CLI_USAGE');
-  return { base, overlays, ...(target ? { target } : {}), color };
+  if (base === undefined && target === undefined) {
+    throw new LayerdotsError(
+      'Active-stack inspection requires --target when --base is omitted.',
+      'CLI_USAGE',
+    );
+  }
+  return {
+    ...(base ? { base } : {}),
+    overlays,
+    ...(target ? { target } : {}),
+    color,
+  };
 }
 
 interface ParsedApply {
-  readonly base: string;
+  readonly base?: string;
   readonly overlays: string[];
   readonly target?: string;
   readonly applyToHome: boolean;
@@ -155,7 +199,12 @@ function parseApply(args: readonly string[]): ParsedApply {
     else if (flag === '--target') target = value;
     else stateDir = value;
   }
-  if (!base) throw new LayerdotsError('Missing required --base.', 'CLI_USAGE');
+  if (base === undefined && target === undefined && !applyToHome) {
+    throw new LayerdotsError(
+      'Active-stack application requires --target or --apply-to-home when --base is omitted.',
+      'CLI_USAGE',
+    );
+  }
   if (target !== undefined && applyToHome) {
     throw new LayerdotsError(
       'Cannot use both --target and --apply-to-home.',
@@ -163,12 +212,61 @@ function parseApply(args: readonly string[]): ParsedApply {
     );
   }
   return {
-    base,
+    ...(base ? { base } : {}),
     overlays,
     ...(target !== undefined ? { target } : {}),
     applyToHome,
     ...(stateDir !== undefined ? { stateDir } : {}),
     approve,
+  };
+}
+
+interface ParsedInit {
+  readonly overlayUrl: string;
+  readonly target: string;
+}
+
+function parseInit(args: readonly string[]): ParsedInit {
+  if (args[0] !== 'init')
+    throw new LayerdotsError('Expected init command.', 'CLI_USAGE');
+  const overlayUrl = args[1];
+  if (!overlayUrl || overlayUrl.startsWith('--')) {
+    throw new LayerdotsError('Missing required overlay URL.', 'CLI_USAGE');
+  }
+  if (args[2] !== '--target' || !args[3] || args.length !== 4) {
+    throw new LayerdotsError(
+      'Expected init <overlay-url> --target <directory>.',
+      'CLI_USAGE',
+    );
+  }
+  return { overlayUrl, target: args[3] };
+}
+
+async function resolveLayers(
+  options: { readonly base?: string; readonly overlays: readonly string[] },
+  target: string | undefined,
+  paths: ReturnType<typeof resolveLayerdotsPaths>,
+): Promise<{ readonly base: string; readonly overlays: string[] }> {
+  if (options.base !== undefined) {
+    return { base: options.base, overlays: [...options.overlays] };
+  }
+  if (target === undefined) {
+    throw new LayerdotsError('Missing target for active stack.', 'CLI_USAGE');
+  }
+  if (options.overlays.length > 0) {
+    throw new LayerdotsError(
+      'Cannot supply --overlay without --base.',
+      'CLI_USAGE',
+    );
+  }
+  const stack = await readActiveStack(paths, target);
+  const [base, ...overlays] = stack.layers;
+  if (base === undefined) {
+    throw new LayerdotsError('Active stack has no layers.', 'STACK_INVALID');
+  }
+  return {
+    base: base.root,
+    overlays: overlays.map((layer) => layer.root),
   };
 }
 

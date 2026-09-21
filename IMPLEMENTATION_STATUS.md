@@ -4,10 +4,10 @@ This file is the handoff ledger for implementation work. Update it after each ve
 
 ## Current Position
 
-- Active milestone: Milestone 2, Safe Target Application
-- Active step: complete
-- Last verified integration: Milestone 2 safe target application, CLI apply command, guarded home resolution, and add/delete/unmanage workflows
-- Next step: Milestone 3, Repository Lifecycle
+- Active milestone: Milestone 3, Repository Lifecycle
+- Active step: prototype bootstrap complete
+- Last verified integration: managed-clone initialization from a top overlay remote, XDG active-stack storage, and active-stack inspect/apply
+- Next step: Milestone 3 transaction staging, coordinated commits, and push
 
 ## Safety Boundary
 
@@ -59,6 +59,14 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Implement distinct add, delete, and unmanage workflows (`src/assignment/workflows.ts`).
 - [x] Pass the full verification gate at 278 tests.
 
+### Milestone 3: Repository Lifecycle
+
+- [x] Resolve XDG configuration, data, state, and cache directories for Layerdots.
+- [x] Clone a top overlay and its recursively pinned parents into managed data storage.
+- [x] Fetch parent branches, verify pinned parent commits, and require clean managed clones.
+- [x] Register one active stack for an explicit target and resolve it through `inspect` and `apply`.
+- [ ] Stage synchronization results, coordinate commits, and push base-to-overlay.
+
 ## Verification Log
 
 - Foundation gate: `corepack pnpm verify` passed on 2026-09-01 with 1 test.
@@ -77,6 +85,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Guarded home-target gate: `corepack pnpm verify` passed on 2026-09-07 with 254 tests after double-opt-in opt-out audit.
 - Workflows gate: `corepack pnpm verify` passed on 2026-09-07 with 278 tests after byte-preservation and regeneration review.
 - Milestone 2 completion gate: `corepack pnpm verify` passed on 2026-09-07 with 278 tests after CLI, home-guard, and workflows review.
+- Prototype bootstrap gate: `corepack pnpm verify` passed on 2026-09-21 with 280 tests after XDG, managed-clone, and active-stack review.
 
 ## Milestone 2 Limitations
 
@@ -88,7 +97,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Milestone 1 Limitations
 
 - `inspect` and `apply` are the only exposed CLI workflows; assignment, rebase, and add/delete/unmanage are core APIs pending transaction command design.
-- Real remotes, commits, and pushes through system Git remain deliberately out of scope (Milestone 3).
+- Managed remotes can now be cloned and inspected/applied, but synchronization staging, commits, and pushes remain in Milestone 3.
 - Portable Node filesystem APIs cannot eliminate every concurrent symlink replacement race; static symlinks are rejected and file leaves use no-follow opens.
 
 ## Resume Checklist

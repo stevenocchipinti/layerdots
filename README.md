@@ -1,10 +1,10 @@
 # Layerdots
 
-Status: Milestone 1 core vertical slice complete
+Status: Milestone 3 prototype bootstrap complete; transaction staging and publishing remain.
 
-Layerdots composes dotfiles from an ordered stack of Git repositories. The current implementation validates and inspects local base/overlay repositories, tracks provenance and target changes, assigns whole hunks in memory, and rebases overlays with isolated conflicts.
+Layerdots composes dotfiles from an ordered stack of Git repositories. It safely applies a composed stack to an explicit target, preserves unmanaged files and local target edits, and isolates conflicts outside the live target.
 
-Development and tests are intentionally sandboxed under the ignored `.layerdots-dev/` directory. The current CLI never defaults to or writes the user's home directory.
+Development and tests are intentionally sandboxed under the ignored `.layerdots-dev/` directory. Applying to the real home remains behind an explicit double opt-in.
 
 ## Development
 
@@ -13,7 +13,17 @@ corepack pnpm install
 corepack pnpm verify
 ```
 
-Inspect local repositories without writing them or a target:
+For a usable prototype, initialize from the top overlay remote and use an explicit sandbox target:
+
+```sh
+corepack pnpm dev -- init <private-overlay-url> --target ~/layerdots-sandbox
+corepack pnpm dev -- inspect --target ~/layerdots-sandbox
+corepack pnpm dev -- apply --target ~/layerdots-sandbox
+```
+
+`init` clones the overlay and each pinned parent under XDG data storage, verifies the parent commits, and records the active stack in XDG configuration. It never writes the target. `apply` stores its merge base in XDG state and writes only managed paths.
+
+For development and explicit local repository testing, repositories can still be supplied directly:
 
 ```sh
 corepack pnpm dev -- inspect --base ./base --overlay ./overlay --color never
