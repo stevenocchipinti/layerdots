@@ -97,6 +97,22 @@ describe('capture loop acceptance', () => {
         )
       ).output,
     ).toContain('STAGED .gitconfig LAYER overlay');
+    const errors: string[] = [];
+    await expect(
+      runCli(
+        [
+          'assign',
+          '.gitconfig',
+          '--layer',
+          'overlay',
+          '--all-hunks',
+          '--target',
+          target,
+        ],
+        { env, stderr: (value) => errors.push(value) },
+      ),
+    ).resolves.toBe(1);
+    expect(errors.join('')).toContain('TRANSACTION_EXISTS');
     expect(
       (await command(['status', '--target', target], env)).output,
     ).toContain('STAGED TRANSACTION');

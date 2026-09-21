@@ -102,6 +102,14 @@ export async function stageAllHunks(options: {
   readonly path: string;
   readonly destination: 'base' | 'overlay';
 }): Promise<StagedTransaction> {
+  if (
+    (await readTransaction(options.paths, options.stack.target)) !== undefined
+  ) {
+    throw new LayerdotsError(
+      'A staged transaction already exists. Commit it before assigning another path.',
+      'TRANSACTION_EXISTS',
+    );
+  }
   const layers = await loadActiveLayers(options.stack);
   const base = required(layers[0]);
   const composed = composeLayers(base, layers.slice(1));
