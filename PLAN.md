@@ -83,6 +83,7 @@ The automated scenario must demonstrate:
 4. [x] Define and implement the manual workflow for moving stored content between layers.
 5. [x] Add stable JSON output for read-only commands.
 6. [x] Add color controls and accessible non-color labels.
+7. [x] Allow multiple assignments and moves, including split hunks of the same path routed to different layers, within one staged transaction before commit.
 
 ## Milestone 5: Stack Lifecycle
 
@@ -91,6 +92,8 @@ The automated scenario must demonstrate:
 3. [x] Purge transient private state after switching away.
 4. [x] Keep clones until explicitly removed.
 5. [x] Exercise stacks with more than one overlay in core and CLI tests.
+6. [x] Add a `discard` command to abandon a staged transaction or stack switch without commit or apply.
+7. [x] Recover a managed clone left dirty by a failed `commit` (for example, an unconfigured Git identity) so a retry never requires manual `git reset`.
 
 ## Milestone 6: Two-Layer TUI
 
@@ -121,4 +124,5 @@ These are intentionally postponed until the vertical slice provides evidence:
 - package manager and distribution mechanism;
 - staging semantics for multi-step manual movement between layers;
 - whether literal `.patch` and `.delete` paths need an escape mechanism;
-- the TUI framework and multi-overlay navigation model.
+- the TUI framework and multi-overlay navigation model;
+- whether `--json` on read-only commands should carry structured records (for example, arrays of `{path, status, owner, operation}`) instead of the current envelope around the rendered human text; Milestone 6 should decide this before building any renderer against CLI JSON, since a TUI driven by the core library directly would not need it, but a JSON-driven client would.

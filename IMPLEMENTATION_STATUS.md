@@ -5,8 +5,8 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 5, Stack Lifecycle
-- Active step: complete
-- Last verified integration: staged stack switching, per-target active-stack registration, transient snapshot cleanup, and multi-overlay lifecycle coverage
+- Active step: complete, including a pre-Milestone-6 review fix-up pass
+- Last verified integration: staged stack switching, per-target active-stack registration, transient snapshot cleanup, multi-overlay lifecycle coverage, multi-assignment staged transactions, a `discard` command for staged transactions and stack switches, and commit-failure rollback for managed clones
 - Next step: Milestone 6, Two-Layer TUI
 
 ## Safety Boundary
@@ -85,6 +85,15 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Retain managed clones while switching; clones remain available for explicit future lifecycle removal.
 - [x] Cover base-plus-two-overlay composition in lifecycle core and CLI acceptance tests.
 
+### Milestone 5 fix-up: pre-Milestone-6 review findings
+
+An independent review before starting Milestone 6 exercised the CLI end-to-end against sandboxed remotes and surfaced four issues, addressed here so they do not compound in the TUI:
+
+- [x] `stageAssignment` and `stageMove` no longer reject a second call outright with `TRANSACTION_EXISTS`. They now build on the existing staged transaction's layers (via `transactionSnapshots`), so distinct hunks of the same path can be routed to different layers, or an assignment and a move can be combined, before a single `commit`. `assignments` already accumulated as an array; the staging functions now actually append to it. `stageLayerSnapshots` (used by `sync`) and `stageStackSwitch` deliberately keep the hard block, since a full parent rebase or a stack switch should not be layered onto a partially-staged assignment.
+- [x] `commitTransaction` now wraps its per-layer materialize/add/commit loop in a rollback: any failure (reproduced with an unconfigured Git identity) runs `git reset --hard HEAD` on every layer before rethrowing, so a managed clone is never left dirty by a failed commit. The staged transaction itself is preserved so the same `commit` can be retried once the underlying cause (for example, Git identity) is fixed, without re-staging or any manual `git reset`. Regression test: `tests/acceptance/commit-recovery.test.ts`.
+- [x] Added a `discard --target <directory>` command that removes a staged transaction (`transaction.json`) or, if none exists, a staged stack switch (`stack-switch-*.json`), without touching the target, the active stack, or any managed clone. Every other staging error message now points at `discard` as the way out. Previously the only way to abandon a stage was to manually delete a file under XDG state, which was not documented anywhere.
+- [ ] `--json` on `inspect`/`status`/`diff` remains a JSON envelope around the exact human-readable text (`{"version":1,"command":...,"output":"<rendered text>"}`), not structured records. This was flagged as a design decision to make explicitly rather than a bug: Milestone 6 (or any other structured consumer) will need real arrays of `{path, status, owner, operation}`-shaped records if it is to render from CLI JSON rather than by calling the core library directly. Deliberately left unresolved here; see Open Decisions.
+
 ## Verification Log
 
 - Foundation gate: `corepack pnpm verify` passed on 2026-09-01 with 1 test.
@@ -109,6 +118,13 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Milestone 3 synchronization gate: `corepack pnpm verify` passed on 2026-09-21 with 284 tests after remote rebase, divergence, and staged synchronization review.
 - Milestone 4 workflow gate: `pnpm verify` passed on 2026-09-21 with 292 tests after interactive selector, line selection, staged review, move, JSON, color, and transaction-safety coverage.
 - Milestone 5 lifecycle gate: `pnpm verify` passed on 2026-09-21 with 294 tests after staged switching, target merge, transient-state cleanup, clone retention, and multi-overlay coverage.
+- Milestone 5 fix-up gate: `pnpm verify` passed on 2026-09-22 with 299 tests after an independent CLI review, adding multi-assignment staged transactions, a `discard` command, commit-failure clone rollback, and bounded test-sandbox growth.
+
+## Milestone 5 Limitations
+
+- `discard` only inspects and removes state files (`transaction.json`, `stack-switch-*.json`) keyed by the resolved target path; it does not require or validate that the target has an active stack registered.
+- `--json` is a text-wrapper, not structured data (see the fix-up note above and the Open Decision in `PLAN.md`).
+- `.layerdots-dev/` previously grew without bound across repeated `pnpm test`/`pnpm verify` runs, since no test or fixture helper ever removed its own sandbox. A Vitest `globalSetup` (`tests/support/global-setup.ts`) now clears it once at the start of every run, and `pnpm clean` removes it (plus `dist`/`coverage`) on demand. Fixtures from the run in progress are still left on disk for post-failure inspection.
 
 ## Milestone 2 Limitations
 
