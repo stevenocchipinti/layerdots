@@ -14,6 +14,7 @@ import { resolveLayerdotsPaths } from '../lifecycle/paths.js';
 import { readActiveStack } from '../lifecycle/stack.js';
 import { writeActiveStack } from '../lifecycle/stack.js';
 import { commitTransaction, pushStack } from '../transaction/transaction.js';
+import { synchronizeStack } from '../synchronization/lifecycle.js';
 
 export function main(args: readonly string[]): number {
   if (args.length === 1 && args[0] === '--version') {
@@ -142,6 +143,19 @@ export async function runCli(
       );
       await pushStack({ stack, env });
       output = 'PUSHED\n';
+    } else if (args[0] === 'sync') {
+      const target = parseTargetCommand(args, 'sync');
+      const stack = await readActiveStack(
+        paths,
+        resolveTargetPath({ cwd, explicitTarget: target, useHome: false }),
+      );
+      const result = await synchronizeStack({ paths, stack, env });
+      output =
+        result.kind === 'clean'
+          ? 'SYNC CLEAN\n'
+          : result.kind === 'staged'
+            ? 'SYNC STAGED\n'
+            : `SYNC CONFLICT WORKSPACE ${result.workspace}\n`;
     } else {
       const options = parseInspect(args);
       const layers = await resolveLayers(options, options.target, paths);

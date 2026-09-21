@@ -35,6 +35,8 @@ corepack pnpm dev -- push --target ~/layerdots-sandbox
 
 This prototype stages every changed hunk at one path. Assignment remains reviewable until `commit`; commits and pushes run from base to overlay. Interactive and individual-line selection remain deferred.
 
+Before committing local changes after a remote update, run `corepack pnpm dev -- sync --target ~/layerdots-sandbox`. Synchronization fetches every layer, rejects divergence, and stages non-conflicting parent rebases. Conflicts are written below XDG state while the live target and active stack remain unchanged.
+
 For development and explicit local repository testing, repositories can still be supplied directly:
 
 ```sh

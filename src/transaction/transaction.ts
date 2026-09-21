@@ -149,6 +149,36 @@ export async function stageAllHunks(options: {
   return transaction;
 }
 
+export async function stageLayerSnapshots(options: {
+  readonly paths: LayerdotsPaths;
+  readonly stack: ActiveStack;
+  readonly layers: readonly LayerSnapshot[];
+}): Promise<StagedTransaction> {
+  if (
+    (await readTransaction(options.paths, options.stack.target)) !== undefined
+  ) {
+    throw new LayerdotsError(
+      'A staged transaction already exists. Commit it before synchronizing.',
+      'TRANSACTION_EXISTS',
+    );
+  }
+  if (options.layers.length !== options.stack.layers.length) {
+    throw new LayerdotsError(
+      'Staged layers do not match the active stack.',
+      'TRANSACTION_INVALID',
+    );
+  }
+  const transaction: StagedTransaction = {
+    version: 1,
+    target: options.stack.target,
+    layers: options.layers.map((layer, index) =>
+      storeLayer(layer, required(options.stack.layers[index])),
+    ),
+  };
+  await writeTransaction(options.paths, transaction);
+  return transaction;
+}
+
 export async function readTransaction(
   paths: LayerdotsPaths,
   target: string,
@@ -250,10 +280,52 @@ export async function pushStack(options: {
 }): Promise<void> {
   for (const layer of options.stack.layers) {
     await requireClean(layer.root, options.env);
+    await requirePushable(layer.root, layer.branch, options.env);
     await runGit(['push', 'origin', `HEAD:refs/heads/${layer.branch}`], {
       cwd: layer.root,
       env: options.env,
     });
+  }
+}
+
+async function requirePushable(
+  root: string,
+  branch: string,
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
+  await runGit(['fetch', '--quiet', 'origin', branch], { cwd: root, env });
+  const head = (
+    await runGit(['rev-parse', 'HEAD'], { cwd: root, env })
+  ).stdout.trim();
+  const remote = (
+    await runGit(['rev-parse', `refs/remotes/origin/${branch}`], {
+      cwd: root,
+      env,
+    })
+  ).stdout.trim();
+  if (head === remote || (await isAncestor(root, remote, head, env))) return;
+  throw new LayerdotsError(
+    `Remote branch diverged for ${root}. Run layerdots sync first.`,
+    'REMOTE_DIVERGED',
+  );
+}
+
+async function isAncestor(
+  root: string,
+  older: string,
+  newer: string,
+  env: NodeJS.ProcessEnv,
+): Promise<boolean> {
+  try {
+    await runGit(['merge-base', '--is-ancestor', older, newer], {
+      cwd: root,
+      env,
+    });
+    return true;
+  } catch (error) {
+    if (error instanceof LayerdotsError && error.code === 'git_command_failed')
+      return false;
+    throw error;
   }
 }
 

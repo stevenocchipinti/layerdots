@@ -73,7 +73,7 @@ The automated scenario must demonstrate:
 8. [x] Coordinate commits from base upward.
 9. [x] Honor Git hooks and signing configuration.
 10. [x] Implement explicit base-to-overlay push.
-11. Detect remote divergence and require synchronization.
+11. [x] Detect remote divergence and require synchronization.
 
 ## Milestone 4: Assignment Workflow
 

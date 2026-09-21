@@ -5,9 +5,9 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 3, Repository Lifecycle
-- Active step: capture loop complete
-- Last verified integration: whole-hunk staging, base-upward commits, and ordered pushes through local bare remotes
-- Next step: remote-divergence detection and reviewed synchronization
+- Active step: complete
+- Last verified integration: remote synchronization staging, isolated conflicts, and divergence checks
+- Next step: Milestone 4, Assignment Workflow
 
 ## Safety Boundary
 
@@ -67,7 +67,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Register one active stack for an explicit target and resolve it through `inspect` and `apply`.
 - [x] Stage whole-hunk assignments for review through `status` and `diff`.
 - [x] Commit staged layer changes from base upward and push in the same order.
-- [ ] Detect remote divergence and require reviewed synchronization.
+- [x] Detect remote divergence, stage non-conflicting parent rebases, and isolate conflicts.
 
 ## Verification Log
 
@@ -90,6 +90,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Prototype bootstrap gate: `corepack pnpm verify` passed on 2026-09-21 with 280 tests after XDG, managed-clone, and active-stack review.
 - Capture-loop gate: `corepack pnpm verify` passed on 2026-09-21 with 281 tests after staged-assignment, commit-order, and push-order review.
 - Multi-path assignment regression gate: `corepack pnpm verify` passed on 2026-09-21 with 282 tests after multi-path staging and no-op patch regression review.
+- Milestone 3 synchronization gate: `corepack pnpm verify` passed on 2026-09-21 with 284 tests after remote rebase, divergence, and staged synchronization review.
 
 ## Milestone 2 Limitations
 
