@@ -7,6 +7,7 @@ export default defineConfig({
       reporter: ['text', 'html'],
     },
     include: ['tests/**/*.test.ts'],
+    globalSetup: ['./tests/support/global-setup.ts'],
     testTimeout: 15_000,
   },
 });
