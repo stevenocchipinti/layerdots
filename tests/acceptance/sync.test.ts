@@ -1,9 +1,10 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { runCli } from '../../src/cli/main.js';
 import { runGit } from '../../src/repositories/git.js';
+import { pushStack } from '../../src/transaction/transaction.js';
 import { createGitFixture } from '../support/git.js';
 import {
   createIsolatedEnvironment,
@@ -194,5 +195,94 @@ describe('synchronization acceptance', () => {
     expect(await readFile(join(clone, 'home/config'), 'utf8')).toBe(
       'original\n',
     );
+  });
+
+  it('does not push an overlay when the parent remote rejects its push', async () => {
+    const sandbox = await createSandbox('sync-push-failure');
+    const env = await createIsolatedEnvironment(sandbox);
+    await writeFile(
+      env.GIT_CONFIG_GLOBAL ?? join(sandbox, 'gitconfig'),
+      '[user]\nname = Test\nemail = test@example.invalid\n',
+    );
+    const base = await createGitFixture({
+      prefix: 'push-base',
+      files: {
+        'layerdots.json': JSON.stringify({ version: 1 }),
+        'home/base': 'one\n',
+      },
+    });
+    const baseRemote = join(sandbox, 'base.git');
+    await bareRemote(base.root, baseRemote, base.env);
+    const overlay = await createGitFixture({
+      prefix: 'push-overlay',
+      files: {
+        'layerdots.json': JSON.stringify({
+          version: 1,
+          parent: { url: baseRemote, branch: 'main', commit: base.head },
+        }),
+        'home/overlay': 'one\n',
+      },
+    });
+    const overlayRemote = join(sandbox, 'overlay.git');
+    await bareRemote(overlay.root, overlayRemote, overlay.env);
+    await runGit(['remote', 'add', 'origin', baseRemote], {
+      cwd: base.root,
+      env,
+    });
+    await runGit(['remote', 'add', 'origin', overlayRemote], {
+      cwd: overlay.root,
+      env,
+    });
+    await writeFile(join(base.root, 'home/base'), 'two\n');
+    await runGit(['add', '--all'], { cwd: base.root, env });
+    await runGit(['commit', '--message', 'Base change'], {
+      cwd: base.root,
+      env,
+    });
+    await writeFile(join(overlay.root, 'home/overlay'), 'two\n');
+    await runGit(['add', '--all'], { cwd: overlay.root, env });
+    await runGit(['commit', '--message', 'Overlay change'], {
+      cwd: overlay.root,
+      env,
+    });
+    const overlayBefore = (
+      await runGit(['--git-dir', overlayRemote, 'rev-parse', 'main'], { env })
+    ).stdout;
+    const hook = join(baseRemote, 'hooks/pre-receive');
+    await writeFile(hook, '#!/bin/sh\nexit 1\n');
+    await chmod(hook, 0o755);
+    const baseHead = (
+      await runGit(['rev-parse', 'HEAD'], { cwd: base.root, env })
+    ).stdout.trim();
+    const overlayHead = (
+      await runGit(['rev-parse', 'HEAD'], { cwd: overlay.root, env })
+    ).stdout.trim();
+    await expect(
+      pushStack({
+        stack: {
+          version: 1,
+          target: join(sandbox, 'target'),
+          layers: [
+            {
+              url: baseRemote,
+              root: base.root,
+              branch: 'main',
+              commit: baseHead,
+            },
+            {
+              url: overlayRemote,
+              root: overlay.root,
+              branch: 'main',
+              commit: overlayHead,
+            },
+          ],
+        },
+        env,
+      }),
+    ).rejects.toThrow();
+    expect(
+      (await runGit(['--git-dir', overlayRemote, 'rev-parse', 'main'], { env }))
+        .stdout,
+    ).toBe(overlayBefore);
   });
 });
