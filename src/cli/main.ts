@@ -14,7 +14,10 @@ import { resolveLayerdotsPaths } from '../lifecycle/paths.js';
 import { readActiveStack } from '../lifecycle/stack.js';
 import { writeActiveStack } from '../lifecycle/stack.js';
 import { commitTransaction, pushStack } from '../transaction/transaction.js';
-import { synchronizeStack } from '../synchronization/lifecycle.js';
+import {
+  recoverSynchronization,
+  synchronizeStack,
+} from '../synchronization/lifecycle.js';
 
 export function main(args: readonly string[]): number {
   if (args.length === 1 && args[0] === '--version') {
@@ -144,18 +147,28 @@ export async function runCli(
       await pushStack({ stack, env });
       output = 'PUSHED\n';
     } else if (args[0] === 'sync') {
-      const target = parseTargetCommand(args, 'sync');
+      const parsed = parseSync(args);
       const stack = await readActiveStack(
         paths,
-        resolveTargetPath({ cwd, explicitTarget: target, useHome: false }),
+        resolveTargetPath({
+          cwd,
+          explicitTarget: parsed.target,
+          useHome: false,
+        }),
       );
+      if (parsed.recover) {
+        output = (await recoverSynchronization(paths, stack, env))
+          ? 'SYNC RECOVERED\n'
+          : 'SYNC CLEAN\n';
+        stdout(output);
+        return 0;
+      }
       const result = await synchronizeStack({ paths, stack, env });
-      output =
-        result.kind === 'clean'
-          ? 'SYNC CLEAN\n'
-          : result.kind === 'staged'
-            ? 'SYNC STAGED\n'
-            : `SYNC CONFLICT WORKSPACE ${result.workspace}\n`;
+      if (result.kind === 'conflict') {
+        stdout(`SYNC CONFLICT WORKSPACE ${result.workspace}\n`);
+        return 1;
+      }
+      output = result.kind === 'clean' ? 'SYNC CLEAN\n' : 'SYNC STAGED\n';
     } else {
       const options = parseInspect(args);
       const layers = await resolveLayers(options, options.target, paths);
@@ -173,6 +186,21 @@ export async function runCli(
     }
     return 1;
   }
+}
+
+function parseSync(args: readonly string[]): {
+  readonly target: string;
+  readonly recover: boolean;
+} {
+  if (args[1] === 'recover') {
+    if (args[2] !== '--target' || !args[3] || args.length !== 4)
+      throw new LayerdotsError(
+        'Expected sync recover --target <directory>.',
+        'CLI_USAGE',
+      );
+    return { target: args[3], recover: true };
+  }
+  return { target: parseTargetCommand(args, 'sync'), recover: false };
 }
 
 function parseTargetCommand(args: readonly string[], command: string): string {

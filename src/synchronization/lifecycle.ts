@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { composeLayers } from '../composition/compose.js';
@@ -28,11 +28,13 @@ export async function synchronizeStack(options: {
   readonly stack: ActiveStack;
   readonly env: NodeJS.ProcessEnv;
 }): Promise<SyncResult> {
+  await recoverSynchronization(options.paths, options.stack, options.env);
   const remote = await preflight(options.stack, options.env);
   if (!remote.some((state) => state.advance)) return { kind: 'clean' };
   const old = await loadLayers(options.stack);
   const changed: number[] = [];
   try {
+    await writeRecovery(options.paths, options.stack);
     const next: LayerSnapshot[] = [];
     for (const [index, layer] of options.stack.layers.entries()) {
       const oldLayer = required(old[index]);
@@ -78,6 +80,7 @@ export async function synchronizeStack(options: {
           plan.conflicts,
         );
         await restore(options.stack, remote, changed, options.env);
+        await clearRecovery(options.paths);
         return { kind: 'conflict', workspace };
       }
       next.push(required(plan.candidate));
@@ -87,11 +90,46 @@ export async function synchronizeStack(options: {
       stack: options.stack,
       layers: next,
     });
+    await clearRecovery(options.paths);
     return { kind: 'staged' };
   } catch (error) {
     await restore(options.stack, remote, changed, options.env);
+    await clearRecovery(options.paths);
     throw error;
   }
+}
+
+export async function recoverSynchronization(
+  paths: LayerdotsPaths,
+  stack: ActiveStack,
+  env: NodeJS.ProcessEnv,
+): Promise<boolean> {
+  let checkpoint: ActiveStack;
+  try {
+    checkpoint = JSON.parse(
+      await readFile(recoveryPath(paths), 'utf8'),
+    ) as ActiveStack;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw new LayerdotsError(
+      'Synchronization recovery checkpoint is invalid.',
+      'SYNCHRONIZATION_RECOVERY_INVALID',
+      { cause: error },
+    );
+  }
+  if (
+    checkpoint.target !== stack.target ||
+    checkpoint.layers.length !== stack.layers.length
+  ) {
+    throw new LayerdotsError(
+      'Synchronization recovery checkpoint does not match the active stack.',
+      'SYNCHRONIZATION_RECOVERY_INVALID',
+    );
+  }
+  for (const layer of checkpoint.layers)
+    await checkout(layer.root, layer.commit, env);
+  await clearRecovery(paths);
+  return true;
 }
 
 async function preflight(
@@ -219,6 +257,24 @@ async function conflictWorkspace(
     transactionId: `sync-${String(Date.now())}`,
     conflicts,
   });
+}
+
+function recoveryPath(paths: LayerdotsPaths): string {
+  return join(paths.state, 'sync-recovery.json');
+}
+
+async function writeRecovery(
+  paths: LayerdotsPaths,
+  stack: ActiveStack,
+): Promise<void> {
+  await mkdir(paths.state, { recursive: true, mode: 0o700 });
+  await writeFile(recoveryPath(paths), `${JSON.stringify(stack)}\n`, {
+    mode: 0o600,
+  });
+}
+
+async function clearRecovery(paths: LayerdotsPaths): Promise<void> {
+  await rm(recoveryPath(paths), { force: true });
 }
 
 async function requireClean(
