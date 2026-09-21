@@ -4,10 +4,10 @@ This file is the handoff ledger for implementation work. Update it after each ve
 
 ## Current Position
 
-- Active milestone: Milestone 3, Repository Lifecycle
+- Active milestone: Milestone 4, Assignment Workflow
 - Active step: complete
-- Last verified integration: remote synchronization staging, isolated conflicts, and divergence checks
-- Next step: Milestone 4, Assignment Workflow
+- Last verified integration: interactive assignment, staged review, transfer workflow, and read-only output controls
+- Next step: Milestone 5, Stack Lifecycle
 
 ## Safety Boundary
 
@@ -69,6 +69,14 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Commit staged layer changes from base upward and push in the same order.
 - [x] Detect remote divergence, stage non-conflicting parent rebases, and isolate conflicts.
 
+### Milestone 4: Assignment Workflow
+
+- [x] Add an interactive hunk selector with per-line changed-edit selection.
+- [x] Make staged assignments reviewable through status and staged-versus-active diff sections.
+- [x] Add explicit `move` staging for delete-and-readd transfer between base and overlay.
+- [x] Provide versioned JSON envelopes for read-only commands.
+- [x] Add `always`, `auto`, and `never` color controls while retaining textual status labels.
+
 ## Verification Log
 
 - Foundation gate: `corepack pnpm verify` passed on 2026-09-01 with 1 test.
@@ -91,6 +99,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Capture-loop gate: `corepack pnpm verify` passed on 2026-09-21 with 281 tests after staged-assignment, commit-order, and push-order review.
 - Multi-path assignment regression gate: `corepack pnpm verify` passed on 2026-09-21 with 282 tests after multi-path staging and no-op patch regression review.
 - Milestone 3 synchronization gate: `corepack pnpm verify` passed on 2026-09-21 with 284 tests after remote rebase, divergence, and staged synchronization review.
+- Milestone 4 workflow gate: `pnpm verify` passed on 2026-09-21 with 292 tests after interactive selector, line selection, staged review, move, JSON, color, and transaction-safety coverage.
 
 ## Milestone 2 Limitations
 

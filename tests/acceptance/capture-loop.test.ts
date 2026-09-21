@@ -82,22 +82,40 @@ describe('capture loop acceptance', () => {
     const status = await command(['status', '--target', target], env);
     expect(status.code).toBe(0);
     expect(status.output).toContain('UNASSIGNED .gitconfig STATUS modified');
+    const jsonStatus: string[] = [];
+    await expect(
+      runCli(['status', '--target', target, '--json'], {
+        env,
+        stdout: (value) => jsonStatus.push(value),
+      }),
+    ).resolves.toBe(0);
+    expect(JSON.parse(jsonStatus.join(''))).toMatchObject({
+      version: 1,
+      command: 'status',
+    });
+    const answers = ['y'];
+    const interactiveOutput: string[] = [];
     expect(
-      (
-        await command(
-          [
-            'assign',
-            '.gitconfig',
-            '--layer',
-            'overlay',
-            '--all-hunks',
-            '--target',
-            target,
-          ],
+      await runCli(
+        [
+          'assign',
+          '.gitconfig',
+          '--layer',
+          'overlay',
+          '--interactive',
+          '--target',
+          target,
+        ],
+        {
           env,
-        )
-      ).output,
-    ).toContain('STAGED .gitconfig LAYER overlay');
+          stdout: (value) => interactiveOutput.push(value),
+          readLine: () => Promise.resolve(answers.shift()),
+        },
+      ),
+    ).toBe(0);
+    expect(interactiveOutput.join('')).toContain(
+      'STAGED .gitconfig LAYER overlay',
+    );
     const errors: string[] = [];
     await expect(
       runCli(
@@ -117,9 +135,13 @@ describe('capture loop acceptance', () => {
     expect(
       (await command(['status', '--target', target], env)).output,
     ).toContain('STAGED TRANSACTION');
-    expect((await command(['diff', '--target', target], env)).output).toContain(
-      'Updated Work',
+    const diff = await command(
+      ['diff', '--target', target, '--color', 'always'],
+      env,
     );
+    expect(diff.output).toContain('Updated Work');
+    expect(diff.output).toContain('STAGED DIFF');
+    expect(diff.output).toContain('\u001b[');
 
     expect(
       (
@@ -140,5 +162,26 @@ describe('capture loop acceptance', () => {
     expect(await readFile(join(target, 'home/.gitconfig'), 'utf8')).toBe(
       '[user]\nname = Updated Work\n',
     );
+
+    await writeFile(join(target, 'home/new-config'), 'new\n');
+    expect(
+      (
+        await command(
+          [
+            'assign',
+            'new-config',
+            '--layer',
+            'overlay',
+            '--all-hunks',
+            '--target',
+            target,
+          ],
+          env,
+        )
+      ).code,
+    ).toBe(0);
+    const stagedAddition = await command(['diff', '--target', target], env);
+    expect(stagedAddition.output).toContain('STAGED DIFF');
+    expect(stagedAddition.output).toMatch(/REMAINING TARGET DIFF\nCLEAN/);
   });
 });

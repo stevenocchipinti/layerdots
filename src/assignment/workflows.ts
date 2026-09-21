@@ -51,6 +51,78 @@ export interface UnmanageResult {
   readonly invalidatedParentPins: readonly string[];
 }
 
+export interface MoveRequest {
+  readonly layers: readonly LayerSnapshot[];
+  readonly composed: {
+    readonly objects: ReadonlyMap<ManagedPath, ManagedObject>;
+  };
+  readonly path: ManagedPath;
+  readonly sourceLayerId: string;
+  readonly destinationLayerId: string;
+}
+
+/** Move a stored representation by deleting it, then re-adding its effective value. */
+export function moveManagedObject(request: MoveRequest): AddResult {
+  const path = validateManagedPath(request.path);
+  const sourceIndex = request.layers.findIndex(
+    (layer) => layer.id === request.sourceLayerId,
+  );
+  const destinationIndex = request.layers.findIndex(
+    (layer) => layer.id === request.destinationLayerId,
+  );
+  if (
+    sourceIndex < 0 ||
+    destinationIndex < 0 ||
+    sourceIndex === destinationIndex
+  )
+    invalid('Move requires distinct source and destination layers.');
+  const source = at(request.layers, sourceIndex);
+  if (!representsPath(source, path))
+    throw new LayerdotsError(
+      `Source layer does not represent ${path}.`,
+      'operation-conflict',
+    );
+  const effective = request.composed.objects.get(path);
+  if (!effective)
+    throw new LayerdotsError(
+      `Cannot move deleted path: ${path}.`,
+      'operation-conflict',
+    );
+  const candidates = request.layers.map(cloneSnapshot);
+  const sourceObjects = mutableObjects(at(candidates, sourceIndex));
+  sourceObjects.delete(path);
+  sourceObjects.delete(`${path}.patch`);
+  sourceObjects.delete(`${path}.delete`);
+  const destination = at(candidates, destinationIndex);
+  if (destinationIndex === 0) {
+    mutableObjects(destination).set(
+      path,
+      requireObject(cloneObjectSingle(effective)),
+    );
+  } else {
+    const lower = composeLayers(
+      firstLayer(candidates),
+      candidates.slice(1, destinationIndex),
+    ).objects.get(path);
+    replaceRepresentation(mutableObjects(destination), path, lower, effective);
+  }
+  regenerateOverlaysAbove(candidates, destinationIndex, path, effective);
+  const after = composeLayers(firstLayer(candidates), candidates.slice(1));
+  const actual = after.objects.get(path);
+  if (!actual || !equalManagedObjects(actual, effective))
+    throw new LayerdotsError(
+      'Move did not preserve effective content.',
+      'workflow-invariant-broken',
+    );
+  verifyAddInvariant(request.composed, after, path);
+  return {
+    layers: candidates,
+    invalidatedParentPins: candidates
+      .slice(Math.min(sourceIndex, destinationIndex) + 1)
+      .map((layer) => layer.id),
+  };
+}
+
 export function addManagedObject(request: AddRequest): AddResult {
   const { layers, path, object } = request;
   if (!Array.isArray(layers) || layers.length === 0)

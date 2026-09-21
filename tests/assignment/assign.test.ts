@@ -224,6 +224,50 @@ describe('assignUnassignedChange', () => {
     ).toBe(true);
   });
 
+  it('assigns selected changed lines within one hunk without taking adjacent edits', () => {
+    const base = snapshot('base', baseManifest, {
+      config: file('one\nthree\n'),
+    });
+    const layers = [base];
+    const composed = composeLayers(base);
+    const target = new Map([['config', file('one\ntwo\nthree\n')]]);
+    const item = change(layers, target);
+    const hunk = item.hunks[0]!;
+    const firstChanged = hunk.edits.findIndex((edit) => edit.kind !== 'same');
+    const result = assignUnassignedChange({
+      layers,
+      composed,
+      change: item,
+      selections: [{ hunkIndex: 0, editIndexes: [firstChanged] }],
+      destinationLayerId: 'base',
+    });
+    expect(text(result.layers[0]!.objects.get('config'))).toBe(
+      'one\ntwo\nthree\n',
+    );
+  });
+
+  it('treats selected replacement additions and removals as independent edits', () => {
+    const base = snapshot('base', baseManifest, {
+      config: file('old\nkeep\n'),
+    });
+    const layers = [base];
+    const composed = composeLayers(base);
+    const target = new Map([['config', file('new\nkeep\n')]]);
+    const item = change(layers, target);
+    const hunk = item.hunks[0]!;
+    const addition = hunk.edits.findIndex((edit) => edit.kind === 'add');
+    const result = assignUnassignedChange({
+      layers,
+      composed,
+      change: item,
+      selections: [{ hunkIndex: 0, editIndexes: [addition] }],
+      destinationLayerId: 'base',
+    });
+    expect(text(result.layers[0]!.objects.get('config'))).toBe(
+      'old\nnew\nkeep\n',
+    );
+  });
+
   it.each([
     ['start', 'X\na\nb\n'],
     ['middle', 'a\nX\nb\n'],

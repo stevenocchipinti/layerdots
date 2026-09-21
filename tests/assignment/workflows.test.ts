@@ -6,6 +6,7 @@ import { composeLayers } from '../../src/composition/compose.js';
 import {
   addManagedObject,
   deleteManagedObject,
+  moveManagedObject,
   unmanageManagedObject,
 } from '../../src/assignment/workflows.js';
 
@@ -179,6 +180,46 @@ describe('addManagedObject', () => {
         destinationLayerId: 'missing',
       }),
     ).toThrow(expect.objectContaining({ code: 'operation-invalid' }));
+  });
+});
+
+describe('moveManagedObject', () => {
+  it('moves a base representation to the overlay without changing effective bytes', () => {
+    const base = snapshot('base', baseManifest, { config: file('value\n') });
+    const overlay = snapshot('overlay-1', overlayManifest, {});
+    const composed = composeLayers(base, [overlay]);
+    const result = moveManagedObject({
+      layers: [base, overlay],
+      composed,
+      path: 'config',
+      sourceLayerId: 'base',
+      destinationLayerId: 'overlay-1',
+    });
+    const after = composeLayers(result.layers[0]!, result.layers.slice(1));
+    expect(text(after.objects.get('config'))).toBe('value\n');
+    expect(result.layers[0]!.objects.has('config')).toBe(false);
+    expect(result.layers[1]!.objects.has('config')).toBe(true);
+  });
+
+  it('moves an overlay representation to the base only by explicit request', () => {
+    const base = snapshot('base', baseManifest, { config: file('public\n') });
+    const overlay = snapshot('overlay-1', overlayManifest, {
+      'config.patch': file(
+        '--- a/config\n+++ b/config\n@@ -1,1 +1,1 @@\n-public\n+private\n',
+      ),
+    });
+    const composed = composeLayers(base, [overlay]);
+    const result = moveManagedObject({
+      layers: [base, overlay],
+      composed,
+      path: 'config',
+      sourceLayerId: 'overlay-1',
+      destinationLayerId: 'base',
+    });
+    const after = composeLayers(result.layers[0]!, result.layers.slice(1));
+    expect(text(after.objects.get('config'))).toBe('private\n');
+    expect(text(result.layers[0]!.objects.get('config'))).toBe('private\n');
+    expect(result.layers[1]!.objects.has('config.patch')).toBe(false);
   });
 });
 

@@ -8,13 +8,18 @@ import {
 } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-import { assignUnassignedChange } from '../assignment/assign.js';
+import {
+  assignUnassignedChange,
+  type AssignmentHunkSelection,
+} from '../assignment/assign.js';
+import { moveManagedObject } from '../assignment/workflows.js';
 import { composeLayers } from '../composition/compose.js';
 import { LayerdotsError } from '../domain/errors.js';
 import type { LayerManifestV1 } from '../domain/manifest.js';
 import type { LayerSnapshot, ManagedObject } from '../domain/objects.js';
 import { detectUnassignedChanges } from '../provenance/unassigned.js';
 import { readManagedPaths } from '../repositories/tree-reader.js';
+import { validateManagedPath } from '../repositories/path-validation.js';
 import { loadLayerSnapshot } from '../repositories/snapshot-loader.js';
 import { runGit } from '../repositories/git.js';
 import type { LayerdotsPaths } from '../lifecycle/paths.js';
@@ -42,6 +47,15 @@ export interface StagedTransaction {
   readonly version: 1;
   readonly target: string;
   readonly layers: readonly StoredLayer[];
+  readonly assignments?: readonly StagedAssignment[];
+}
+
+export interface StagedAssignment {
+  readonly path: string;
+  readonly destination: 'base' | 'overlay';
+  readonly selections: readonly AssignmentHunkSelection[];
+  readonly operation?: 'assign' | 'move';
+  readonly source?: 'base' | 'overlay';
 }
 
 function transactionPath(paths: LayerdotsPaths): string {
@@ -102,6 +116,16 @@ export async function stageAllHunks(options: {
   readonly path: string;
   readonly destination: 'base' | 'overlay';
 }): Promise<StagedTransaction> {
+  return stageAssignment(options);
+}
+
+export async function stageAssignment(options: {
+  readonly paths: LayerdotsPaths;
+  readonly stack: ActiveStack;
+  readonly path: string;
+  readonly destination: 'base' | 'overlay';
+  readonly selections?: readonly AssignmentHunkSelection[];
+}): Promise<StagedTransaction> {
   if (
     (await readTransaction(options.paths, options.stack.target)) !== undefined
   ) {
@@ -128,14 +152,15 @@ export async function stageAllHunks(options: {
     options.destination === 'base'
       ? 'base'
       : `overlay-${String(layers.length - 1)}`;
+  const selections =
+    options.selections ??
+    change.hunks.map((_hunk, index) => ({ hunkIndex: index }));
   const result = assignUnassignedChange({
     layers,
     composed,
     change,
-    hunkIndexes:
-      change.kind === 'whole-object'
-        ? [0]
-        : change.hunks.map((_hunk, index) => index),
+    selections:
+      change.kind === 'whole-object' ? [{ hunkIndex: 0 }] : selections,
     destinationLayerId,
   });
   const transaction: StagedTransaction = {
@@ -144,9 +169,23 @@ export async function stageAllHunks(options: {
     layers: result.layers.map((layer, index) =>
       storeLayer(layer, required(options.stack.layers[index])),
     ),
+    assignments: [
+      {
+        path: options.path,
+        destination: options.destination,
+        selections:
+          change.kind === 'whole-object' ? [{ hunkIndex: 0 }] : selections,
+      },
+    ],
   };
   await writeTransaction(options.paths, transaction);
   return transaction;
+}
+
+export function transactionSnapshots(
+  transaction: StagedTransaction,
+): readonly LayerSnapshot[] {
+  return transaction.layers.map(snapshotFromLayer);
 }
 
 export async function stageLayerSnapshots(options: {
@@ -179,6 +218,57 @@ export async function stageLayerSnapshots(options: {
   return transaction;
 }
 
+export async function stageMove(options: {
+  readonly paths: LayerdotsPaths;
+  readonly stack: ActiveStack;
+  readonly path: string;
+  readonly source: 'base' | 'overlay';
+  readonly destination: 'base' | 'overlay';
+}): Promise<StagedTransaction> {
+  if (options.source === options.destination)
+    throw new LayerdotsError(
+      'Move requires distinct layers.',
+      'TRANSACTION_INVALID',
+    );
+  if (
+    (await readTransaction(options.paths, options.stack.target)) !== undefined
+  )
+    throw new LayerdotsError(
+      'A staged transaction already exists. Commit it before moving content.',
+      'TRANSACTION_EXISTS',
+    );
+  const layers = await loadActiveLayers(options.stack);
+  const base = required(layers[0]);
+  const composed = composeLayers(base, layers.slice(1));
+  const idFor = (role: 'base' | 'overlay') =>
+    role === 'base' ? 'base' : `overlay-${String(layers.length - 1)}`;
+  const result = moveManagedObject({
+    layers,
+    composed,
+    path: options.path,
+    sourceLayerId: idFor(options.source),
+    destinationLayerId: idFor(options.destination),
+  });
+  const transaction: StagedTransaction = {
+    version: 1,
+    target: options.stack.target,
+    layers: result.layers.map((layer, index) =>
+      storeLayer(layer, required(options.stack.layers[index])),
+    ),
+    assignments: [
+      {
+        path: options.path,
+        source: options.source,
+        destination: options.destination,
+        operation: 'move',
+        selections: [],
+      },
+    ],
+  };
+  await writeTransaction(options.paths, transaction);
+  return transaction;
+}
+
 export async function readTransaction(
   paths: LayerdotsPaths,
   target: string,
@@ -186,19 +276,7 @@ export async function readTransaction(
   try {
     const raw = await readFile(transactionPath(paths), 'utf8');
     const transaction = JSON.parse(raw) as unknown;
-    if (
-      typeof transaction !== 'object' ||
-      transaction === null ||
-      (transaction as Record<string, unknown>).version !== 1 ||
-      (transaction as Record<string, unknown>).target !== resolve(target) ||
-      !Array.isArray((transaction as Record<string, unknown>).layers)
-    ) {
-      throw new LayerdotsError(
-        'Staged transaction does not match this target.',
-        'TRANSACTION_INVALID',
-      );
-    }
-    return transaction as StagedTransaction;
+    return validateTransaction(transaction, target);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     if (error instanceof LayerdotsError) throw error;
@@ -231,6 +309,19 @@ export async function commitTransaction(options: {
       'Staged transaction is invalid.',
       'TRANSACTION_INVALID',
     );
+  for (const [index, layer] of layers.entries()) {
+    const active = required(options.stack.layers[index]);
+    if (
+      layer.root !== active.root ||
+      layer.url !== active.url ||
+      layer.branch !== active.branch ||
+      layer.commit !== active.commit
+    )
+      throw new LayerdotsError(
+        'Staged transaction does not match the active stack.',
+        'TRANSACTION_INVALID',
+      );
+  }
   const next: ActiveStack['layers'][number][] = [];
   let parentCommit: string | undefined;
   for (const [index, layer] of layers.entries()) {
@@ -399,6 +490,67 @@ async function materializeLayer(
       });
     } else await symlink(object.target, destination);
   }
+}
+
+function validateTransaction(
+  value: unknown,
+  target: string,
+): StagedTransaction {
+  if (typeof value !== 'object' || value === null) invalidTransaction();
+  const transaction = value as Record<string, unknown>;
+  if (
+    transaction.version !== 1 ||
+    transaction.target !== resolve(target) ||
+    !Array.isArray(transaction.layers)
+  )
+    invalidTransaction();
+  for (const layer of transaction.layers) validateStoredLayer(layer);
+  return transaction as unknown as StagedTransaction;
+}
+
+function validateStoredLayer(value: unknown): void {
+  if (typeof value !== 'object' || value === null) invalidTransaction();
+  const layer = value as Record<string, unknown>;
+  for (const field of ['id', 'url', 'root', 'branch', 'commit'])
+    if (typeof layer[field] !== 'string') invalidTransaction();
+  const manifest = layer.manifest;
+  if (typeof manifest !== 'object' || manifest === null) invalidTransaction();
+  const record = manifest as Record<string, unknown>;
+  if (record.version !== 1) invalidTransaction();
+  if (record.parent !== undefined) {
+    if (typeof record.parent !== 'object' || record.parent === null)
+      invalidTransaction();
+    const parent = record.parent as Record<string, unknown>;
+    for (const field of ['url', 'branch', 'commit'])
+      if (typeof parent[field] !== 'string') invalidTransaction();
+  }
+  if (!Array.isArray(layer.objects)) invalidTransaction();
+  for (const object of layer.objects) {
+    if (typeof object !== 'object' || object === null) invalidTransaction();
+    const stored = object as Record<string, unknown>;
+    if (typeof stored.path !== 'string') invalidTransaction();
+    try {
+      validateManagedPath(stored.path);
+    } catch {
+      invalidTransaction();
+    }
+    if (stored.kind === 'file') {
+      if (
+        typeof stored.content !== 'string' ||
+        typeof stored.executable !== 'boolean'
+      )
+        invalidTransaction();
+    } else if (stored.kind !== 'symlink' || typeof stored.target !== 'string') {
+      invalidTransaction();
+    }
+  }
+}
+
+function invalidTransaction(): never {
+  throw new LayerdotsError(
+    'Staged transaction is invalid.',
+    'TRANSACTION_INVALID',
+  );
 }
 
 function required<T>(value: T | undefined): T {
