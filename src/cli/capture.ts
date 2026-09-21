@@ -15,6 +15,7 @@ import {
   stageAssignment,
   transactionSnapshots,
 } from '../transaction/transaction.js';
+import { composeStack, readStackSwitch } from '../lifecycle/switch.js';
 import type { AssignmentHunkSelection } from '../assignment/assign.js';
 
 async function loaded(stack: ActiveStack) {
@@ -49,6 +50,10 @@ export async function captureStatus(options: {
     options.paths,
     options.stack.target,
   );
+  const stackSwitch = await readStackSwitch(
+    options.paths,
+    options.stack.target,
+  );
   const lines = changes.map(
     (change) =>
       `UNASSIGNED ${change.path} STATUS ${change.status} KIND ${change.kind}`,
@@ -60,6 +65,10 @@ export async function captureStatus(options: {
         `STAGED ${assignment.path} LAYER ${assignment.destination} SELECTIONS ${String(assignment.selections.length)}`,
       );
   }
+  if (stackSwitch !== undefined)
+    lines.push(
+      `STAGED STACK SWITCH LAYERS ${String(stackSwitch.from.layers.length)} -> ${String(stackSwitch.to.layers.length)}`,
+    );
   return `${(lines.length === 0 ? ['CLEAN'] : lines).join('\n')}\n`;
 }
 
@@ -70,6 +79,10 @@ export async function captureDiff(options: {
 }): Promise<string> {
   const { composed } = await loaded(options.stack);
   const transaction = await readTransaction(
+    options.paths,
+    options.stack.target,
+  );
+  const stackSwitch = await readStackSwitch(
     options.paths,
     options.stack.target,
   );
@@ -92,7 +105,28 @@ export async function captureDiff(options: {
     changes.length === 0
       ? 'CLEAN\n'
       : `${renderManagedDiff(changes, { color: options.color }).trimEnd()}\n`;
-  if (transaction === undefined) return current;
+  if (transaction === undefined && stackSwitch === undefined) return current;
+  if (stackSwitch !== undefined) {
+    const staged = await composeStack(stackSwitch.to);
+    const review = renderManagedDiff(
+      compareManagedState(composed.objects, staged.objects).filter(
+        (change) => change.status !== 'unchanged',
+      ),
+      { color: options.color },
+    ).trimEnd();
+    return [
+      'TARGET DIFF',
+      current.trimEnd(),
+      'STAGED STACK SWITCH',
+      review || 'CLEAN',
+      '',
+    ].join('\n');
+  }
+  if (transaction === undefined)
+    throw new LayerdotsError(
+      'Staged transaction is invalid.',
+      'TRANSACTION_INVALID',
+    );
   if (!staged)
     throw new LayerdotsError(
       'Staged transaction has no layers.',

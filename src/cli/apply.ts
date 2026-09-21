@@ -13,6 +13,7 @@ export interface ApplyOptions {
   readonly approve: readonly string[];
   readonly cwd?: string;
   readonly applyToHome?: boolean;
+  readonly targetId?: string;
 }
 
 export async function applyCommand(options: ApplyOptions): Promise<string> {
@@ -39,7 +40,7 @@ export async function applyCommand(options: ApplyOptions): Promise<string> {
   const result = await applyComposition({
     targetRoot: target,
     stateDir,
-    targetId: 'default',
+    targetId: options.targetId ?? 'default',
     composed,
     approvals,
     workspaceRoot,

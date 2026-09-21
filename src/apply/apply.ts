@@ -43,6 +43,11 @@ export interface ApplyInput {
   readonly allowedSandboxRoot: string;
 }
 
+export interface CompositionPreview {
+  readonly state: ReturnType<typeof emptyAppliedState>;
+  readonly conflicts: readonly ApplyConflict[];
+}
+
 interface ChangePlan {
   readonly existing: ExistingObjectKind;
   readonly target: TargetObjectKind;
@@ -184,6 +189,47 @@ export async function applyComposition(
       { cause: error instanceof Error ? error : undefined },
     );
   }
+}
+
+/** Validate the same three-way target transition used by apply without writing live files. */
+export async function previewComposition(
+  input: ApplyInput,
+): Promise<CompositionPreview> {
+  const {
+    stateDir,
+    targetId,
+    targetRoot,
+    composed,
+    workspaceRoot,
+    allowedSandboxRoot,
+  } = input;
+  for (const path of composed.objects.keys()) validateManagedPath(path);
+  const state =
+    (await readAppliedState(stateDir, targetId)) ?? emptyAppliedState();
+  const affectedPaths = [
+    ...new Set([...state.objects.keys(), ...composed.objects.keys()]),
+  ].sort();
+  assertNoCaseCollisions(affectedPaths);
+  const ours = await readManagedPaths(targetRoot, affectedPaths);
+  const merged = mergeThreeWay(
+    { objects: state.objects },
+    { objects: ours },
+    { objects: composed.objects },
+  );
+  if (merged.conflicts.length === 0) return { state, conflicts: [] };
+  const workspace = await writeConflictWorkspace({
+    workspaceRoot,
+    transactionId: `${targetId}-switch-${String(Date.now())}`,
+    conflicts: merged.conflicts,
+    allowedSandboxRoot,
+  });
+  return {
+    state,
+    conflicts: merged.conflicts.map((conflict) => ({
+      path: conflict.path,
+      workspace,
+    })),
+  };
 }
 
 function assertNoCaseCollisions(paths: readonly ManagedPath[]): void {

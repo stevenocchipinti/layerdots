@@ -1,6 +1,6 @@
 # Layerdots
 
-Status: Milestone 4 assignment workflow complete.
+Status: Milestone 5 stack lifecycle complete.
 
 Layerdots composes dotfiles from an ordered stack of Git repositories. It safely applies a composed stack to an explicit target, preserves unmanaged files and local target edits, and isolates conflicts outside the live target.
 
@@ -22,6 +22,17 @@ corepack pnpm dev -- apply --target ~/layerdots-sandbox
 ```
 
 `init` clones the overlay and each pinned parent under XDG data storage, verifies the parent commits, and records the active stack in XDG configuration. It never writes the target. `apply` stores its merge base in XDG state and writes only managed paths.
+
+Each target has one active stack. To replace it, stage a reviewed three-way transition rather than replacing live files immediately:
+
+```sh
+corepack pnpm dev -- switch <new-top-overlay-url> --target ~/layerdots-sandbox
+corepack pnpm dev -- status --target ~/layerdots-sandbox
+corepack pnpm dev -- diff --target ~/layerdots-sandbox
+corepack pnpm dev -- switch apply --target ~/layerdots-sandbox
+```
+
+`switch` leaves the target and active stack unchanged until `switch apply`. Conflicts are isolated outside the target. A completed switch removes its transient staged snapshot, preserves unmanaged files and non-conflicting target edits through the three-way merge, and retains managed repository clones for later reuse.
 
 Capture a target edit into the active overlay, review it, then commit and publish it:
 

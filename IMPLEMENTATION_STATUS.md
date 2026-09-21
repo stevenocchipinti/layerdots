@@ -4,10 +4,10 @@ This file is the handoff ledger for implementation work. Update it after each ve
 
 ## Current Position
 
-- Active milestone: Milestone 4, Assignment Workflow
+- Active milestone: Milestone 5, Stack Lifecycle
 - Active step: complete
-- Last verified integration: interactive assignment, staged review, transfer workflow, and read-only output controls
-- Next step: Milestone 5, Stack Lifecycle
+- Last verified integration: staged stack switching, per-target active-stack registration, transient snapshot cleanup, and multi-overlay lifecycle coverage
+- Next step: Milestone 6, Two-Layer TUI
 
 ## Safety Boundary
 
@@ -77,6 +77,14 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Provide versioned JSON envelopes for read-only commands.
 - [x] Add `always`, `auto`, and `never` color controls while retaining textual status labels.
 
+### Milestone 5: Stack Lifecycle
+
+- [x] Register active stacks independently per target and reject a second active stack for the same target.
+- [x] Stage `switch <top-overlay-url> --target <directory>` as a three-way target transition, review it with `status` and `diff`, and finalize with `switch apply --target <directory>`.
+- [x] Remove the staged switch snapshot after a successful switch while retaining the new applied state as the next merge base.
+- [x] Retain managed clones while switching; clones remain available for explicit future lifecycle removal.
+- [x] Cover base-plus-two-overlay composition in lifecycle core and CLI acceptance tests.
+
 ## Verification Log
 
 - Foundation gate: `corepack pnpm verify` passed on 2026-09-01 with 1 test.
@@ -100,6 +108,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Multi-path assignment regression gate: `corepack pnpm verify` passed on 2026-09-21 with 282 tests after multi-path staging and no-op patch regression review.
 - Milestone 3 synchronization gate: `corepack pnpm verify` passed on 2026-09-21 with 284 tests after remote rebase, divergence, and staged synchronization review.
 - Milestone 4 workflow gate: `pnpm verify` passed on 2026-09-21 with 292 tests after interactive selector, line selection, staged review, move, JSON, color, and transaction-safety coverage.
+- Milestone 5 lifecycle gate: `pnpm verify` passed on 2026-09-21 with 294 tests after staged switching, target merge, transient-state cleanup, clone retention, and multi-overlay coverage.
 
 ## Milestone 2 Limitations
 

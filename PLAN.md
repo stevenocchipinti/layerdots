@@ -86,11 +86,11 @@ The automated scenario must demonstrate:
 
 ## Milestone 5: Stack Lifecycle
 
-1. Enforce one active stack per target.
-2. Stage stack switches as three-way target transitions.
-3. Purge transient private state after switching away.
-4. Keep clones until explicitly removed.
-5. Exercise stacks with more than one overlay in core and CLI tests.
+1. [x] Enforce one active stack per target.
+2. [x] Stage stack switches as three-way target transitions.
+3. [x] Purge transient private state after switching away.
+4. [x] Keep clones until explicitly removed.
+5. [x] Exercise stacks with more than one overlay in core and CLI tests.
 
 ## Milestone 6: Two-Layer TUI
 
