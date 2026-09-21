@@ -69,10 +69,10 @@ The automated scenario must demonstrate:
 4. [x] Initialize recursively from a top overlay URL.
 5. [x] Fetch tracked parent branches and exact pinned commits.
 6. [x] Require clean repository worktrees.
-7. Stage synchronization results for review.
-8. Coordinate commits from base upward.
-9. Honor Git hooks and signing configuration.
-10. Implement explicit base-to-overlay push.
+7. [x] Stage repository changes for review.
+8. [x] Coordinate commits from base upward.
+9. [x] Honor Git hooks and signing configuration.
+10. [x] Implement explicit base-to-overlay push.
 11. Detect remote divergence and require synchronization.
 
 ## Milestone 4: Assignment Workflow

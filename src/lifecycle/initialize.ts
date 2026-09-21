@@ -117,8 +117,22 @@ export async function initializeStack(
     const commit = (
       await runGit(['rev-parse', 'HEAD'], { cwd: root, env: options.env })
     ).stdout.trim();
+    const branch =
+      expectedParent?.branch ??
+      (
+        await runGit(['branch', '--show-current'], {
+          cwd: root,
+          env: options.env,
+        })
+      ).stdout.trim();
+    if (branch === '') {
+      throw new LayerdotsError(
+        `Cannot determine the tracked branch for ${url}.`,
+        'REPOSITORY_BRANCH_UNKNOWN',
+      );
+    }
     const manifest = await readManifest(root);
-    layers.unshift({ url, root, commit });
+    layers.unshift({ url, root, branch, commit });
     if (manifest.parent === undefined) break;
     expectedParent = manifest.parent;
     url = manifest.parent.url;

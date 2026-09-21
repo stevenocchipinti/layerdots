@@ -23,6 +23,18 @@ corepack pnpm dev -- apply --target ~/layerdots-sandbox
 
 `init` clones the overlay and each pinned parent under XDG data storage, verifies the parent commits, and records the active stack in XDG configuration. It never writes the target. `apply` stores its merge base in XDG state and writes only managed paths.
 
+Capture a target edit into the active overlay, review it, then commit and publish it:
+
+```sh
+corepack pnpm dev -- status --target ~/layerdots-sandbox
+corepack pnpm dev -- assign .gitconfig --layer overlay --all-hunks --target ~/layerdots-sandbox
+corepack pnpm dev -- diff --target ~/layerdots-sandbox
+corepack pnpm dev -- commit --message "Update work Git identity" --target ~/layerdots-sandbox
+corepack pnpm dev -- push --target ~/layerdots-sandbox
+```
+
+This prototype stages every changed hunk at one path. Assignment remains reviewable until `commit`; commits and pushes run from base to overlay. Interactive and individual-line selection remain deferred.
+
 For development and explicit local repository testing, repositories can still be supplied directly:
 
 ```sh

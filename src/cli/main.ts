@@ -3,6 +3,7 @@
 import { pathToFileURL } from 'node:url';
 import { LayerdotsError } from '../domain/errors.js';
 import { applyCommand } from './apply.js';
+import { assignCommand, captureDiff, captureStatus } from './capture.js';
 import { inspect } from './inspect.js';
 import { resolveTargetPath } from './target.js';
 import {
@@ -11,6 +12,8 @@ import {
 } from '../lifecycle/initialize.js';
 import { resolveLayerdotsPaths } from '../lifecycle/paths.js';
 import { readActiveStack } from '../lifecycle/stack.js';
+import { writeActiveStack } from '../lifecycle/stack.js';
+import { commitTransaction, pushStack } from '../transaction/transaction.js';
 
 export function main(args: readonly string[]): number {
   if (args.length === 1 && args[0] === '--version') {
@@ -83,6 +86,62 @@ export async function runCli(
           : {}),
       };
       output = await applyCommand(options);
+    } else if (args[0] === 'status') {
+      const target = parseTargetCommand(args, 'status');
+      const stack = await readActiveStack(
+        paths,
+        resolveTargetPath({ cwd, explicitTarget: target, useHome: false }),
+      );
+      output = await captureStatus({ stack, paths });
+    } else if (args[0] === 'diff') {
+      const target = parseTargetCommand(args, 'diff');
+      const stack = await readActiveStack(
+        paths,
+        resolveTargetPath({ cwd, explicitTarget: target, useHome: false }),
+      );
+      output = await captureDiff({ stack, color: 'never' });
+    } else if (args[0] === 'assign') {
+      const parsed = parseAssign(args);
+      const stack = await readActiveStack(
+        paths,
+        resolveTargetPath({
+          cwd,
+          explicitTarget: parsed.target,
+          useHome: false,
+        }),
+      );
+      output = await assignCommand({
+        stack,
+        paths,
+        path: parsed.path,
+        layer: parsed.layer,
+      });
+    } else if (args[0] === 'commit') {
+      const parsed = parseCommit(args);
+      const stack = await readActiveStack(
+        paths,
+        resolveTargetPath({
+          cwd,
+          explicitTarget: parsed.target,
+          useHome: false,
+        }),
+      );
+      const next = await commitTransaction({
+        paths,
+        stack,
+        env,
+        message: parsed.message,
+      });
+      await writeActiveStack(paths, next);
+      output = 'COMMITTED\n';
+    } else if (args[0] === 'push') {
+      const target = parseTargetCommand(args, 'push');
+      const stack = await readActiveStack(
+        paths,
+        resolveTargetPath({ cwd, explicitTarget: target, useHome: false }),
+      );
+      await pushStack({ stack, env });
+      output = 'PUSHED\n';
     } else {
       const options = parseInspect(args);
       const layers = await resolveLayers(options, options.target, paths);
@@ -100,6 +159,65 @@ export async function runCli(
     }
     return 1;
   }
+}
+
+function parseTargetCommand(args: readonly string[], command: string): string {
+  if (
+    args[0] !== command ||
+    args[1] !== '--target' ||
+    !args[2] ||
+    args.length !== 3
+  ) {
+    throw new LayerdotsError(
+      `Expected ${command} --target <directory>.`,
+      'CLI_USAGE',
+    );
+  }
+  return args[2];
+}
+
+interface ParsedAssign {
+  readonly path: string;
+  readonly layer: 'base' | 'overlay';
+  readonly target: string;
+}
+function parseAssign(args: readonly string[]): ParsedAssign {
+  const path = args[1];
+  if (
+    !path ||
+    args[2] !== '--layer' ||
+    (args[3] !== 'base' && args[3] !== 'overlay') ||
+    args[4] !== '--all-hunks' ||
+    args[5] !== '--target' ||
+    !args[6] ||
+    args.length !== 7
+  ) {
+    throw new LayerdotsError(
+      'Expected assign <path> --layer base|overlay --all-hunks --target <directory>.',
+      'CLI_USAGE',
+    );
+  }
+  return { path, layer: args[3], target: args[6] };
+}
+
+interface ParsedCommit {
+  readonly message: string;
+  readonly target: string;
+}
+function parseCommit(args: readonly string[]): ParsedCommit {
+  if (
+    args[1] !== '--message' ||
+    !args[2] ||
+    args[3] !== '--target' ||
+    !args[4] ||
+    args.length !== 5
+  ) {
+    throw new LayerdotsError(
+      'Expected commit --message <message> --target <directory>.',
+      'CLI_USAGE',
+    );
+  }
+  return { message: args[2], target: args[4] };
 }
 
 interface ParsedInspect {

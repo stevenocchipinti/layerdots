@@ -7,6 +7,7 @@ import type { LayerdotsPaths } from './paths.js';
 export interface ActiveLayer {
   readonly url: string;
   readonly root: string;
+  readonly branch: string;
   readonly commit: string;
 }
 
@@ -46,6 +47,7 @@ function parseStack(value: unknown): ActiveStack {
       layer === null ||
       typeof (layer as Record<string, unknown>).url !== 'string' ||
       typeof (layer as Record<string, unknown>).root !== 'string' ||
+      typeof (layer as Record<string, unknown>).branch !== 'string' ||
       typeof (layer as Record<string, unknown>).commit !== 'string'
     ) {
       throw new LayerdotsError(

@@ -5,9 +5,9 @@ This file is the handoff ledger for implementation work. Update it after each ve
 ## Current Position
 
 - Active milestone: Milestone 3, Repository Lifecycle
-- Active step: prototype bootstrap complete
-- Last verified integration: managed-clone initialization from a top overlay remote, XDG active-stack storage, and active-stack inspect/apply
-- Next step: Milestone 3 transaction staging, coordinated commits, and push
+- Active step: capture loop complete
+- Last verified integration: whole-hunk staging, base-upward commits, and ordered pushes through local bare remotes
+- Next step: remote-divergence detection and reviewed synchronization
 
 ## Safety Boundary
 
@@ -65,7 +65,9 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - [x] Clone a top overlay and its recursively pinned parents into managed data storage.
 - [x] Fetch parent branches, verify pinned parent commits, and require clean managed clones.
 - [x] Register one active stack for an explicit target and resolve it through `inspect` and `apply`.
-- [ ] Stage synchronization results, coordinate commits, and push base-to-overlay.
+- [x] Stage whole-hunk assignments for review through `status` and `diff`.
+- [x] Commit staged layer changes from base upward and push in the same order.
+- [ ] Detect remote divergence and require reviewed synchronization.
 
 ## Verification Log
 
@@ -86,6 +88,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Workflows gate: `corepack pnpm verify` passed on 2026-09-07 with 278 tests after byte-preservation and regeneration review.
 - Milestone 2 completion gate: `corepack pnpm verify` passed on 2026-09-07 with 278 tests after CLI, home-guard, and workflows review.
 - Prototype bootstrap gate: `corepack pnpm verify` passed on 2026-09-21 with 280 tests after XDG, managed-clone, and active-stack review.
+- Capture-loop gate: `corepack pnpm verify` passed on 2026-09-21 with 281 tests after staged-assignment, commit-order, and push-order review.
 
 ## Milestone 2 Limitations
 
