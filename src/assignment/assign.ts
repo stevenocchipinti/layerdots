@@ -33,16 +33,25 @@ export interface AssignmentRequest {
     readonly objects: ReadonlyMap<ManagedPath, ManagedObject>;
   };
   readonly change: UnassignedChange;
-  readonly hunkIndexes: readonly number[];
+  /** Complete hunks retained for the original programmatic API. */
+  readonly hunkIndexes?: readonly number[];
+  /** Changed edit indexes selected within their respective hunks. */
+  readonly selections?: readonly AssignmentHunkSelection[];
   readonly destinationLayerId: string;
+}
+
+export interface AssignmentHunkSelection {
+  readonly hunkIndex: number;
+  /** Omit to select every changed edit in the hunk. */
+  readonly editIndexes?: readonly number[];
 }
 
 export function assignUnassignedChange(
   request: AssignmentRequest,
 ): AssignmentResult {
   const { layers, change } = validateRequest(request);
-  const indexes = normalizeIndexes(request.hunkIndexes, change);
-  const selected = selectObject(change, indexes);
+  const operations = normalizeSelection(request, change);
+  const selected = selectObject(change, operations);
   const candidates = layers.map(cloneSnapshot);
   const destinationIndex = candidates.findIndex(
     (layer) => layer.id === request.destinationLayerId,
@@ -56,7 +65,7 @@ export function assignUnassignedChange(
       request.composed.objects.get(change.path),
       selected,
       change,
-      indexes,
+      operations,
     );
   } else {
     const lower = composeLayers(
@@ -83,7 +92,12 @@ export function assignUnassignedChange(
       firstLayer(candidates),
       candidates.slice(1, index),
     ).objects.get(change.path);
-    const desired = projectDelta(originalEffective, selected, change, indexes);
+    const desired = projectDelta(
+      originalEffective,
+      selected,
+      change,
+      operations,
+    );
     replaceRepresentation(
       mutableObjects(at(candidates, index)),
       change.path,
@@ -343,8 +357,20 @@ function validateContext(
   /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 }
 
+function normalizeSelection(
+  request: AssignmentRequest,
+  change: UnassignedChange,
+): Operation[] {
+  const selections = request.selections;
+  if (selections !== undefined)
+    return operationsForSelections(selections, change);
+  const indexes = normalizeIndexes(request.hunkIndexes, change);
+  if (change.kind === 'whole-object') return [];
+  return indexes.flatMap((index) => operation(at(change.hunks, index)));
+}
+
 function normalizeIndexes(
-  indexes: readonly number[],
+  indexes: readonly number[] | undefined,
   change: UnassignedChange,
 ): number[] {
   /* eslint-disable @typescript-eslint/no-unsafe-return */
@@ -371,17 +397,13 @@ function normalizeIndexes(
 
 function selectObject(
   change: UnassignedChange,
-  indexes: readonly number[],
+  operations: readonly Operation[],
 ): ManagedObject | undefined {
   if (change.kind === 'whole-object') return cloneObject(change.actual);
   const expected = requireFile(change.expected);
   const actual = requireFile(change.actual);
   const lines = splitTextLines(expected.content);
-  applyOperations(
-    lines,
-    indexes.flatMap((index) => operation(at(change.hunks, index))),
-    splitTextLines(actual.content),
-  );
+  applyOperations(lines, operations, splitTextLines(actual.content));
   return {
     kind: 'file',
     content: encodeLines(lines),
@@ -403,6 +425,118 @@ function operation(hunk: UnassignedHunk): Operation {
     .map((edit) => edit.line);
   const boundary = oldIndices[0] ?? insertionBoundary(hunk);
   return { oldIndices, newLines, boundary };
+}
+
+function operationsForSelections(
+  selections: readonly AssignmentHunkSelection[],
+  change: UnassignedChange,
+): Operation[] {
+  const rawSelections: unknown = selections;
+  if (!Array.isArray(rawSelections) || rawSelections.length === 0)
+    invalid('Assignment requires at least one selected hunk or line.');
+  if (change.kind === 'whole-object') {
+    const selection = selectionRecord(rawSelections[0]);
+    if (
+      rawSelections.length !== 1 ||
+      selection.hunkIndex !== 0 ||
+      selection.editIndexes !== undefined
+    )
+      invalid('Whole-object changes require selection index 0.');
+    return [];
+  }
+  const used = new Set<number>();
+  const operations: Operation[] = [];
+  for (const rawSelection of rawSelections) {
+    const selection = selectionRecord(rawSelection);
+    const hunkIndex = selection.hunkIndex;
+    if (
+      typeof hunkIndex !== 'number' ||
+      !Number.isInteger(hunkIndex) ||
+      hunkIndex < 0 ||
+      hunkIndex >= change.hunks.length ||
+      used.has(hunkIndex)
+    )
+      invalid('Assignment contains an invalid hunk selection.');
+    used.add(hunkIndex);
+    const hunk = at(change.hunks, hunkIndex);
+    if (selection.editIndexes === undefined) {
+      operations.push(operation(hunk));
+      continue;
+    }
+    const selectedEdits: unknown = selection.editIndexes;
+    if (!isNumberArray(selectedEdits) || selectedEdits.length === 0)
+      invalid('Assignment line selection is empty.');
+    const indexes = [...new Set(selectedEdits)].sort((a, b) => a - b);
+    if (
+      indexes.some(
+        (index) =>
+          !Number.isInteger(index) ||
+          index < 0 ||
+          index >= hunk.edits.length ||
+          at(hunk.edits, index).kind === 'same',
+      )
+    )
+      invalid('Assignment line selection must contain changed hunk edits.');
+    operations.push(...operationsForEdits(hunk, indexes));
+  }
+  return operations;
+}
+
+function selectionRecord(value: unknown): {
+  readonly hunkIndex: unknown;
+  readonly editIndexes: unknown;
+} {
+  if (typeof value !== 'object' || value === null)
+    invalid('Assignment contains an invalid hunk selection.');
+  const record = value as Record<string, unknown>;
+  return { hunkIndex: record.hunkIndex, editIndexes: record.editIndexes };
+}
+
+function isNumberArray(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === 'number')
+  );
+}
+
+function operationsForEdits(
+  hunk: UnassignedHunk,
+  selectedIndexes: readonly number[],
+): Operation[] {
+  const selected = new Set(selectedIndexes);
+  const operations: Operation[] = [];
+  let current: UnassignedEdit[] = [];
+  const flush = () => {
+    if (current.length === 0) return;
+    const oldIndices = current.flatMap((edit) =>
+      edit.kind === 'add' || edit.oldIndex === undefined ? [] : [edit.oldIndex],
+    );
+    const newLines = current
+      .filter((edit) => edit.kind !== 'remove')
+      .map((edit) => edit.line);
+    const first = current[0];
+    if (!first) invalid('Assignment line selection is malformed.');
+    const boundary = oldIndices[0] ?? boundaryForEdit(hunk, first);
+    operations.push({ oldIndices, newLines, boundary });
+    current = [];
+  };
+  for (const [index, edit] of hunk.edits.entries()) {
+    if (!selected.has(index)) {
+      flush();
+      continue;
+    }
+    current.push(edit);
+  }
+  flush();
+  return operations;
+}
+
+function boundaryForEdit(hunk: UnassignedHunk, first: UnassignedEdit): number {
+  const index = hunk.edits.indexOf(first);
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const oldIndex = hunk.edits[cursor]?.oldIndex;
+    if (oldIndex !== undefined) return oldIndex + 1;
+  }
+  return insertionBoundary(hunk);
 }
 
 function insertionBoundary(hunk: UnassignedHunk): number {
@@ -442,7 +576,7 @@ function projectToBase(
   composed: ManagedObject | undefined,
   selected: ManagedObject | undefined,
   change: UnassignedChange,
-  indexes: readonly number[],
+  operations: readonly Operation[],
 ): void {
   const base = at(candidates, index).objects.get(change.path);
   if (change.kind === 'whole-object') {
@@ -462,7 +596,7 @@ function projectToBase(
   applyProjected(
     result,
     alignment,
-    indexes.map((item) => operation(at(change.hunks, item))),
+    operations,
     splitTextLines(selectedFile.content),
   );
   update(mutableObjects(at(candidates, index)), change.path, {
@@ -476,7 +610,7 @@ function projectDelta(
   effective: ManagedObject | undefined,
   selected: ManagedObject | undefined,
   change: UnassignedChange,
-  indexes: readonly number[],
+  operations: readonly Operation[],
 ): ManagedObject | undefined {
   if (change.kind === 'whole-object') return selected;
   const effectiveFile = requireFile(effective);
@@ -487,7 +621,7 @@ function projectDelta(
   applyProjected(
     result,
     alignment,
-    indexes.map((item) => operation(at(change.hunks, item))),
+    operations,
     splitTextLines(selectedFile.content),
   );
   return {
@@ -650,7 +784,7 @@ function isAssignmentRequest(value: unknown): value is AssignmentRequest {
     record.composed !== null &&
     typeof record.change === 'object' &&
     record.change !== null &&
-    Array.isArray(record.hunkIndexes) &&
+    (Array.isArray(record.hunkIndexes) || Array.isArray(record.selections)) &&
     typeof record.destinationLayerId === 'string'
   );
 }

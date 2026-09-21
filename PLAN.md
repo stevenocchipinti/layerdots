@@ -77,12 +77,12 @@ The automated scenario must demonstrate:
 
 ## Milestone 4: Assignment Workflow
 
-1. Add an interactive `git add -p`-style hunk selector.
-2. Make the staged transaction visible through status and diff commands.
-3. Add individual changed-line selection.
-4. Define and implement the manual workflow for moving stored content between layers.
-5. Add stable JSON output for read-only commands.
-6. Add color controls and accessible non-color labels.
+1. [x] Add an interactive `git add -p`-style hunk selector.
+2. [x] Make the staged transaction visible through status and diff commands.
+3. [x] Add individual changed-line selection.
+4. [x] Define and implement the manual workflow for moving stored content between layers.
+5. [x] Add stable JSON output for read-only commands.
+6. [x] Add color controls and accessible non-color labels.
 
 ## Milestone 5: Stack Lifecycle
 
