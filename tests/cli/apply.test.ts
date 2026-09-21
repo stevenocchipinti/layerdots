@@ -400,6 +400,14 @@ describe('apply', () => {
     );
     expect(emptyApprove.code).toBe(1);
     expect(emptyApprove.stderr).toContain('CLI_USAGE');
+
+    const managedTarget = await runApply(
+      env,
+      ['apply', '--base', base.root, '--target', join(sandbox, 'xdg/data')],
+      sandbox,
+    );
+    expect(managedTarget.code).toBe(1);
+    expect(managedTarget.stderr).toContain('TARGET_OVERLAPS_LAYERDOTS_DATA');
   });
 
   it('rejects apply without an explicit target', async () => {

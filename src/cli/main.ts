@@ -5,7 +5,10 @@ import { LayerdotsError } from '../domain/errors.js';
 import { applyCommand } from './apply.js';
 import { inspect } from './inspect.js';
 import { resolveTargetPath } from './target.js';
-import { initializeStack } from '../lifecycle/initialize.js';
+import {
+  assertTargetOutsideLayerdotsPaths,
+  initializeStack,
+} from '../lifecycle/initialize.js';
 import { resolveLayerdotsPaths } from '../lifecycle/paths.js';
 import { readActiveStack } from '../lifecycle/stack.js';
 
@@ -68,6 +71,7 @@ export async function runCli(
           : {}),
         useHome: parsed.applyToHome,
       });
+      assertTargetOutsideLayerdotsPaths(target, paths);
       const layers = await resolveLayers(parsed, target, paths);
       const options = {
         ...parsed,

@@ -96,7 +96,7 @@ export interface InitializeOptions {
 export async function initializeStack(
   options: InitializeOptions,
 ): Promise<ActiveStack> {
-  assertSafeTarget(options.target, options.paths);
+  assertTargetOutsideLayerdotsPaths(options.target, options.paths);
   const layers: ActiveLayer[] = [];
   let url = options.overlayUrl;
   let expectedParent: ParentReference | undefined;
@@ -133,7 +133,10 @@ export async function initializeStack(
   return stack;
 }
 
-function assertSafeTarget(target: string, paths: LayerdotsPaths): void {
+export function assertTargetOutsideLayerdotsPaths(
+  target: string,
+  paths: LayerdotsPaths,
+): void {
   const resolvedTarget = resolve(target);
   for (const managedPath of [
     paths.config,
