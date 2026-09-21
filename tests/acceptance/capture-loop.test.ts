@@ -43,6 +43,7 @@ describe('capture loop acceptance', () => {
       prefix: 'capture-base',
       files: {
         'layerdots.json': JSON.stringify({ version: 1 }),
+        'home/.config/nvim/init.lua': 'return {}\n',
         'home/.gitconfig': '[user]\nname = Personal\n',
       },
     });

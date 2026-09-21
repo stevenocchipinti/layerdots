@@ -111,6 +111,30 @@ describe('assignUnassignedChange', () => {
     );
   });
 
+  it('does not create an identity patch in an overlay that does not represent the path', () => {
+    const base = snapshot('base', baseManifest, {
+      bashrc: file('export EDITOR=nano\n'),
+    });
+    const overlay = snapshot('work', overlayManifest, {});
+    const layers = [base, overlay];
+    const target = new Map([['bashrc', file('export EDITOR=vim\n')]]);
+    const result = assignUnassignedChange({
+      layers,
+      composed: composeLayers(base, [overlay]),
+      change: change(layers, target, 'bashrc'),
+      hunkIndexes: [0],
+      destinationLayerId: 'base',
+    });
+    expect(result.layers[1]!.objects.has('bashrc.patch')).toBe(false);
+    expect(
+      text(
+        composeLayers(result.layers[0]!, result.layers.slice(1)).objects.get(
+          'bashrc',
+        ),
+      ),
+    ).toBe('export EDITOR=vim\n');
+  });
+
   it.each([
     ['added', undefined, file('new')],
     ['deleted', file('old'), undefined],

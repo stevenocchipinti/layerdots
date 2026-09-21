@@ -113,11 +113,12 @@ export async function stageAllHunks(options: {
   const layers = await loadActiveLayers(options.stack);
   const base = required(layers[0]);
   const composed = composeLayers(base, layers.slice(1));
-  const target = await readManagedPaths(options.stack.target, [options.path]);
+  const targetPaths = new Set([...composed.objects.keys(), options.path]);
+  const target = await readManagedPaths(options.stack.target, targetPaths);
   const change = detectUnassignedChanges(layers, composed, target, [
-    options.path,
-  ])[0];
-  if (change === undefined || change.path !== options.path) {
+    ...targetPaths,
+  ]).find((candidate) => candidate.path === options.path);
+  if (change === undefined) {
     throw new LayerdotsError(
       `No unassigned change exists at ${options.path}.`,
       'ASSIGNMENT_NOT_FOUND',

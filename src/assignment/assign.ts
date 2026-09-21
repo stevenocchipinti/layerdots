@@ -571,6 +571,7 @@ function replaceRepresentation(
       });
     return;
   }
+  if (lower && equalManagedObjects(lower, desired)) return;
   if (
     lower?.kind === 'file' &&
     desired.kind === 'file' &&
@@ -593,10 +594,8 @@ function replaceRepresentation(
         throw error;
     }
   }
-  if (!lower || !equalManagedObjects(lower, desired)) {
-    const clone = cloneObject(desired);
-    if (clone) objects.set(path, clone);
-  }
+  const clone = cloneObject(desired);
+  if (clone) objects.set(path, clone);
 }
 
 function requireFile(

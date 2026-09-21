@@ -89,6 +89,7 @@ This file is the handoff ledger for implementation work. Update it after each ve
 - Milestone 2 completion gate: `corepack pnpm verify` passed on 2026-09-07 with 278 tests after CLI, home-guard, and workflows review.
 - Prototype bootstrap gate: `corepack pnpm verify` passed on 2026-09-21 with 280 tests after XDG, managed-clone, and active-stack review.
 - Capture-loop gate: `corepack pnpm verify` passed on 2026-09-21 with 281 tests after staged-assignment, commit-order, and push-order review.
+- Multi-path assignment regression gate: `corepack pnpm verify` passed on 2026-09-21 with 282 tests after multi-path staging and no-op patch regression review.
 
 ## Milestone 2 Limitations
 
