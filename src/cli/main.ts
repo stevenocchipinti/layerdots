@@ -26,6 +26,7 @@ import {
 import { writeActiveStack } from '../lifecycle/stack.js';
 import {
   commitTransaction,
+  discardTransaction,
   pushStack,
   stageMove,
 } from '../transaction/transaction.js';
@@ -35,6 +36,7 @@ import {
 } from '../synchronization/lifecycle.js';
 import {
   applyStackSwitch,
+  discardStackSwitch,
   readStackSwitch,
   stageStackSwitch,
 } from '../lifecycle/switch.js';
@@ -129,7 +131,7 @@ export async function runCli(
         (await readStackSwitch(paths, target)) !== undefined
       )
         throw new LayerdotsError(
-          'A stack switch is staged. Review it, then run layerdots switch apply --target <directory>.',
+          'A stack switch is staged. Review it, then run layerdots switch apply --target <directory>, or discard it with layerdots discard --target <directory>.',
           'TRANSACTION_EXISTS',
         );
       const layers = await resolveLayers(parsed, target, paths);
@@ -263,6 +265,24 @@ export async function runCli(
       );
       await stageMove({ paths, stack, ...parsed });
       output = `STAGED MOVE ${parsed.path} FROM ${parsed.source} TO ${parsed.destination}\n`;
+    } else if (args[0] === 'discard') {
+      const target = resolveTargetPath({
+        cwd,
+        explicitTarget: parseTargetCommand(args, 'discard'),
+        useHome: false,
+      });
+      const discardedTransaction = await discardTransaction(paths, target);
+      const discardedSwitch = discardedTransaction
+        ? false
+        : await discardStackSwitch(paths, target);
+      if (!discardedTransaction && !discardedSwitch)
+        throw new LayerdotsError(
+          'Nothing is staged for this target.',
+          'TRANSACTION_NOT_FOUND',
+        );
+      output = discardedTransaction
+        ? 'DISCARDED TRANSACTION\n'
+        : 'DISCARDED STACK SWITCH\n';
     } else if (args[0] === 'push') {
       const target = parseTargetCommand(args, 'push');
       const stack = await readActiveStack(

@@ -36,14 +36,14 @@ export async function stageStackSwitch(options: {
     (await readTransaction(options.paths, options.stack.target)) !== undefined
   )
     throw new LayerdotsError(
-      'A staged transaction already exists. Commit it before switching stacks.',
+      'A staged transaction already exists. Commit it, or discard it with layerdots discard, before switching stacks.',
       'TRANSACTION_EXISTS',
     );
   if (
     (await readStackSwitch(options.paths, options.stack.target)) !== undefined
   )
     throw new LayerdotsError(
-      'A stack switch is already staged. Apply it before staging another switch.',
+      'A stack switch is already staged. Apply it, or discard it with layerdots discard, before staging another switch.',
       'TRANSACTION_EXISTS',
     );
   const candidate = await discoverStack({
@@ -113,6 +113,20 @@ export async function applyStackSwitch(options: {
   // state is retained as the next merge base, while this transient snapshot is removed.
   await rm(switchPath(options.paths, staged.target), { force: true });
   return result.written;
+}
+
+/**
+ * Discard a staged stack switch without touching the live target or the
+ * active stack. Returns false when nothing was staged.
+ */
+export async function discardStackSwitch(
+  paths: LayerdotsPaths,
+  target: string,
+): Promise<boolean> {
+  const existing = await readStackSwitch(paths, target);
+  if (existing === undefined) return false;
+  await rm(switchPath(paths, target), { force: true });
+  return true;
 }
 
 export async function readStackSwitch(
