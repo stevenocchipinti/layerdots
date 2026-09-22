@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf .layerdots-dev dist coverage",
     "dev": "tsx src/cli/main.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

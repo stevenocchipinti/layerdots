@@ -14,13 +14,19 @@ import { resolveTargetPath } from './target.js';
 import { resolveColor, type ColorOption } from './color.js';
 import {
   assertTargetOutsideLayerdotsPaths,
+  discoverStack,
   initializeStack,
 } from '../lifecycle/initialize.js';
 import { resolveLayerdotsPaths } from '../lifecycle/paths.js';
-import { readActiveStack } from '../lifecycle/stack.js';
+import {
+  hasActiveStack,
+  readActiveStack,
+  targetStateId,
+} from '../lifecycle/stack.js';
 import { writeActiveStack } from '../lifecycle/stack.js';
 import {
   commitTransaction,
+  discardTransaction,
   pushStack,
   stageMove,
 } from '../transaction/transaction.js';
@@ -28,6 +34,12 @@ import {
   recoverSynchronization,
   synchronizeStack,
 } from '../synchronization/lifecycle.js';
+import {
+  applyStackSwitch,
+  discardStackSwitch,
+  readStackSwitch,
+  stageStackSwitch,
+} from '../lifecycle/switch.js';
 
 export function main(args: readonly string[]): number {
   if (args.length === 1 && args[0] === '--version') {
@@ -73,13 +85,26 @@ export async function runCli(
     const paths = resolveLayerdotsPaths(env);
     if (args[0] === 'init') {
       const parsed = parseInit(args);
+      const target = resolveTargetPath({
+        cwd,
+        explicitTarget: parsed.target,
+        useHome: false,
+      });
+      if (await hasActiveStack(paths, target)) {
+        await discoverStack({
+          overlayUrl: parsed.overlayUrl,
+          target,
+          paths,
+          env,
+        });
+        throw new LayerdotsError(
+          `A stack is already active for target ${target}. Use layerdots switch <overlay-url> --target <directory>.`,
+          'STACK_ALREADY_ACTIVE',
+        );
+      }
       const stack = await initializeStack({
         overlayUrl: parsed.overlayUrl,
-        target: resolveTargetPath({
-          cwd,
-          explicitTarget: parsed.target,
-          useHome: false,
-        }),
+        target,
         paths,
         env,
       });
@@ -101,6 +126,14 @@ export async function runCli(
         useHome: parsed.applyToHome,
       });
       assertTargetOutsideLayerdotsPaths(target, paths);
+      if (
+        usesActiveStack &&
+        (await readStackSwitch(paths, target)) !== undefined
+      )
+        throw new LayerdotsError(
+          'A stack switch is staged. Review it, then run layerdots switch apply --target <directory>, or discard it with layerdots discard --target <directory>.',
+          'TRANSACTION_EXISTS',
+        );
       const layers = await resolveLayers(parsed, target, paths);
       const options = {
         ...parsed,
@@ -110,8 +143,39 @@ export async function runCli(
         ...(parsed.stateDir === undefined && usesActiveStack
           ? { stateDir: paths.state }
           : {}),
+        ...(usesActiveStack ? { targetId: targetStateId(target) } : {}),
       };
       output = await applyCommand(options);
+    } else if (args[0] === 'switch') {
+      const parsed = parseSwitch(args);
+      const target = resolveTargetPath({
+        cwd,
+        explicitTarget: parsed.target,
+        useHome: false,
+      });
+      const stack = await readActiveStack(paths, target);
+      if (parsed.apply) {
+        const written = await applyStackSwitch({ paths, stack });
+        output = `SWITCHED\n${written.map((path) => `WRITTEN ${path}`).join('\n')}${written.length > 0 ? '\n' : ''}`;
+      } else {
+        const result = await stageStackSwitch({
+          paths,
+          stack,
+          overlayUrl: parsed.overlayUrl,
+          env,
+        });
+        if (result.conflicts.length > 0) {
+          const workspace = result.conflicts[0];
+          if (workspace === undefined)
+            throw new LayerdotsError(
+              'Stack switch conflict is invalid.',
+              'STACK_SWITCH_CONFLICT',
+            );
+          stdout(`SWITCH CONFLICT WORKSPACE ${workspace}\n`);
+          return 1;
+        }
+        output = 'SWITCH STAGED\n';
+      }
     } else if (args[0] === 'status') {
       const parsed = parseReadCommand(args, 'status');
       const stack = await readActiveStack(
@@ -201,6 +265,24 @@ export async function runCli(
       );
       await stageMove({ paths, stack, ...parsed });
       output = `STAGED MOVE ${parsed.path} FROM ${parsed.source} TO ${parsed.destination}\n`;
+    } else if (args[0] === 'discard') {
+      const target = resolveTargetPath({
+        cwd,
+        explicitTarget: parseTargetCommand(args, 'discard'),
+        useHome: false,
+      });
+      const discardedTransaction = await discardTransaction(paths, target);
+      const discardedSwitch = discardedTransaction
+        ? false
+        : await discardStackSwitch(paths, target);
+      if (!discardedTransaction && !discardedSwitch)
+        throw new LayerdotsError(
+          'Nothing is staged for this target.',
+          'TRANSACTION_NOT_FOUND',
+        );
+      output = discardedTransaction
+        ? 'DISCARDED TRANSACTION\n'
+        : 'DISCARDED STACK SWITCH\n';
     } else if (args[0] === 'push') {
       const target = parseTargetCommand(args, 'push');
       const stack = await readActiveStack(
@@ -299,6 +381,30 @@ function parseSync(args: readonly string[]): {
     return { target: args[3], recover: true };
   }
   return { target: parseTargetCommand(args, 'sync'), recover: false };
+}
+
+function parseSwitch(args: readonly string[]):
+  | { readonly apply: true; readonly target: string }
+  | {
+      readonly apply: false;
+      readonly overlayUrl: string;
+      readonly target: string;
+    } {
+  if (args[1] === 'apply') {
+    if (args[2] === '--target' && args[3] && args.length === 4)
+      return { apply: true, target: args[3] };
+  } else if (
+    args[1] &&
+    args[2] === '--target' &&
+    args[3] &&
+    args.length === 4
+  ) {
+    return { apply: false, overlayUrl: args[1], target: args[3] };
+  }
+  throw new LayerdotsError(
+    'Expected switch <overlay-url> --target <directory> or switch apply --target <directory>.',
+    'CLI_USAGE',
+  );
 }
 
 function parseTargetCommand(args: readonly string[], command: string): string {

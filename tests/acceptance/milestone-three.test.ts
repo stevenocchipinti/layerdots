@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { runCli } from '../../src/cli/main.js';
+import { targetStateId } from '../../src/lifecycle/stack.js';
 import { runGit } from '../../src/repositories/git.js';
 import { createGitFixture } from '../support/git.js';
 import {
@@ -78,7 +79,9 @@ describe('Milestone 3 acceptance', () => {
     expect(await readFile(join(target, 'home/.gitconfig'), 'utf8')).toBe(
       '[user]\nname = Overlay\n',
     );
-    await access(join(sandbox, 'xdg/state/layerdots/default.json'));
+    await access(
+      join(sandbox, 'xdg/state/layerdots', `${targetStateId(target)}.json`),
+    );
   });
 
   it('rejects initialization when a managed clone is dirty', async () => {

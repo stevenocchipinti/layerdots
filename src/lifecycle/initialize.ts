@@ -97,6 +97,15 @@ export async function initializeStack(
   options: InitializeOptions,
 ): Promise<ActiveStack> {
   assertTargetOutsideLayerdotsPaths(options.target, options.paths);
+  const stack = await discoverStack(options);
+  await writeActiveStack(options.paths, stack);
+  return stack;
+}
+
+export async function discoverStack(
+  options: InitializeOptions,
+): Promise<ActiveStack> {
+  assertTargetOutsideLayerdotsPaths(options.target, options.paths);
   const layers: ActiveLayer[] = [];
   let url = options.overlayUrl;
   let expectedParent: ParentReference | undefined;
@@ -143,7 +152,6 @@ export async function initializeStack(
     target: resolve(options.target),
     layers,
   };
-  await writeActiveStack(options.paths, stack);
   return stack;
 }
 

@@ -126,15 +126,10 @@ export async function stageAssignment(options: {
   readonly destination: 'base' | 'overlay';
   readonly selections?: readonly AssignmentHunkSelection[];
 }): Promise<StagedTransaction> {
-  if (
-    (await readTransaction(options.paths, options.stack.target)) !== undefined
-  ) {
-    throw new LayerdotsError(
-      'A staged transaction already exists. Commit it before assigning another path.',
-      'TRANSACTION_EXISTS',
-    );
-  }
-  const layers = await loadActiveLayers(options.stack);
+  const existing = await readTransaction(options.paths, options.stack.target);
+  const layers = existing
+    ? [...transactionSnapshots(existing)]
+    : await loadActiveLayers(options.stack);
   const base = required(layers[0]);
   const composed = composeLayers(base, layers.slice(1));
   const targetPaths = new Set([...composed.objects.keys(), options.path]);
@@ -170,6 +165,7 @@ export async function stageAssignment(options: {
       storeLayer(layer, required(options.stack.layers[index])),
     ),
     assignments: [
+      ...(existing?.assignments ?? []),
       {
         path: options.path,
         destination: options.destination,
@@ -197,7 +193,7 @@ export async function stageLayerSnapshots(options: {
     (await readTransaction(options.paths, options.stack.target)) !== undefined
   ) {
     throw new LayerdotsError(
-      'A staged transaction already exists. Commit it before synchronizing.',
+      'A staged transaction already exists. Commit it, or discard it with layerdots discard, before synchronizing.',
       'TRANSACTION_EXISTS',
     );
   }
@@ -230,14 +226,10 @@ export async function stageMove(options: {
       'Move requires distinct layers.',
       'TRANSACTION_INVALID',
     );
-  if (
-    (await readTransaction(options.paths, options.stack.target)) !== undefined
-  )
-    throw new LayerdotsError(
-      'A staged transaction already exists. Commit it before moving content.',
-      'TRANSACTION_EXISTS',
-    );
-  const layers = await loadActiveLayers(options.stack);
+  const existing = await readTransaction(options.paths, options.stack.target);
+  const layers = existing
+    ? [...transactionSnapshots(existing)]
+    : await loadActiveLayers(options.stack);
   const base = required(layers[0]);
   const composed = composeLayers(base, layers.slice(1));
   const idFor = (role: 'base' | 'overlay') =>
@@ -256,6 +248,7 @@ export async function stageMove(options: {
       storeLayer(layer, required(options.stack.layers[index])),
     ),
     assignments: [
+      ...(existing?.assignments ?? []),
       {
         path: options.path,
         source: options.source,
@@ -286,6 +279,20 @@ export async function readTransaction(
       { cause: error },
     );
   }
+}
+
+/**
+ * Discard a staged transaction without touching any managed clone or the
+ * live target. Returns false when nothing was staged.
+ */
+export async function discardTransaction(
+  paths: LayerdotsPaths,
+  target: string,
+): Promise<boolean> {
+  const existing = await readTransaction(paths, target);
+  if (existing === undefined) return false;
+  await rm(transactionPath(paths), { force: true });
+  return true;
 }
 
 export async function commitTransaction(options: {
@@ -324,45 +331,74 @@ export async function commitTransaction(options: {
   }
   const next: ActiveStack['layers'][number][] = [];
   let parentCommit: string | undefined;
-  for (const [index, layer] of layers.entries()) {
-    await requireClean(layer.root, options.env);
-    const manifest: LayerManifestV1 =
-      index === 0
-        ? layer.manifest
-        : {
-            ...layer.manifest,
-            parent: {
-              ...required(layer.manifest.parent),
-              commit: required(parentCommit),
-            },
-          };
-    await materializeLayer(
-      layer.root,
-      index === 0 || manifest.parent?.commit === layer.manifest.parent?.commit
-        ? undefined
-        : manifest,
-      snapshotFromLayer(layer).objects,
-    );
-    await runGit(['add', '--all'], { cwd: layer.root, env: options.env });
-    const changed = await hasStagedChanges(layer.root, options.env);
-    if (changed)
-      await runGit(['commit', '--message', options.message], {
-        cwd: layer.root,
-        env: options.env,
+  try {
+    for (const [index, layer] of layers.entries()) {
+      await requireClean(layer.root, options.env);
+      const manifest: LayerManifestV1 =
+        index === 0
+          ? layer.manifest
+          : {
+              ...layer.manifest,
+              parent: {
+                ...required(layer.manifest.parent),
+                commit: required(parentCommit),
+              },
+            };
+      await materializeLayer(
+        layer.root,
+        index === 0 || manifest.parent?.commit === layer.manifest.parent?.commit
+          ? undefined
+          : manifest,
+        snapshotFromLayer(layer).objects,
+      );
+      await runGit(['add', '--all'], { cwd: layer.root, env: options.env });
+      const changed = await hasStagedChanges(layer.root, options.env);
+      if (changed)
+        await runGit(['commit', '--message', options.message], {
+          cwd: layer.root,
+          env: options.env,
+        });
+      const commit = (
+        await runGit(['rev-parse', 'HEAD'], {
+          cwd: layer.root,
+          env: options.env,
+        })
+      ).stdout.trim();
+      parentCommit = commit;
+      next.push({
+        url: layer.url,
+        root: layer.root,
+        branch: layer.branch,
+        commit,
       });
-    const commit = (
-      await runGit(['rev-parse', 'HEAD'], { cwd: layer.root, env: options.env })
-    ).stdout.trim();
-    parentCommit = commit;
-    next.push({
-      url: layer.url,
-      root: layer.root,
-      branch: layer.branch,
-      commit,
-    });
+    }
+  } catch (error) {
+    // A layer that failed to commit (for example, due to unconfigured Git
+    // identity) can be left with staged or materialized changes from
+    // `materializeLayer`/`git add`. Restore every layer to its last commit so
+    // a retry after fixing the underlying cause does not fail with
+    // `REPOSITORY_DIRTY`. The staged transaction itself is left intact so the
+    // same commit can be retried without re-staging.
+    await rollbackLayers(layers, options.env);
+    throw error;
   }
   await rm(transactionPath(options.paths), { force: true });
   return { version: 1, target: options.stack.target, layers: next };
+}
+
+async function rollbackLayers(
+  layers: readonly StoredLayer[],
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
+  for (const layer of layers) {
+    try {
+      await runGit(['reset', '--hard', 'HEAD'], { cwd: layer.root, env });
+    } catch {
+      // Best-effort recovery. The original commit failure is what surfaces
+      // to the caller; a layer that cannot even be reset is reported the
+      // next time a command touches it.
+    }
+  }
 }
 
 export async function pushStack(options: {

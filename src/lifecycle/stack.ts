@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -17,10 +18,22 @@ export interface ActiveStack {
   readonly layers: readonly ActiveLayer[];
 }
 
+export function targetStateId(target: string): string {
+  return createHash('sha256')
+    .update(resolve(target))
+    .digest('hex')
+    .slice(0, 24);
+}
+
 const STACK_FILE = 'active-stack.json';
+const STACKS_FILE = 'active-stacks.json';
 
 function stackPath(paths: LayerdotsPaths): string {
   return resolve(paths.config, STACK_FILE);
+}
+
+function stacksPath(paths: LayerdotsPaths): string {
+  return resolve(paths.config, STACKS_FILE);
 }
 
 function parseStack(value: unknown): ActiveStack {
@@ -70,25 +83,95 @@ export async function writeActiveStack(
     mode: 0o600,
   });
   await rename(temporary, destination);
+  const stacks = await readStacks(paths);
+  stacks.set(stack.target, stack);
+  const registry = stacksPath(paths);
+  const registryTemporary = `${registry}.${String(process.pid)}.tmp`;
+  await writeFile(
+    registryTemporary,
+    `${JSON.stringify({ version: 1, stacks: [...stacks.values()] }, null, 2)}\n`,
+    { mode: 0o600 },
+  );
+  await rename(registryTemporary, registry);
 }
 
 export async function readActiveStack(
   paths: LayerdotsPaths,
   target: string,
 ): Promise<ActiveStack> {
-  let text: string;
-  try {
-    text = await readFile(stackPath(paths), 'utf8');
-  } catch (error) {
+  const stacks = await readStacks(paths);
+  const resolvedTarget = resolve(target);
+  const stack = stacks.get(resolvedTarget);
+  if (stack === undefined) {
     throw new LayerdotsError(
-      'No active stack is configured. Run layerdots init <overlay-url> --target <directory>.',
-      'STACK_NOT_CONFIGURED',
-      { cause: error },
+      stacks.size === 0
+        ? 'No active stack is configured. Run layerdots init <overlay-url> --target <directory>.'
+        : `No active stack is configured for target ${resolvedTarget}.`,
+      stacks.size === 0
+        ? 'STACK_NOT_CONFIGURED'
+        : 'STACK_TARGET_NOT_CONFIGURED',
     );
   }
-  let stack: ActiveStack;
+  return stack;
+}
+
+export async function hasActiveStack(
+  paths: LayerdotsPaths,
+  target: string,
+): Promise<boolean> {
+  return (await readStacks(paths)).has(resolve(target));
+}
+
+async function readStacks(
+  paths: LayerdotsPaths,
+): Promise<Map<string, ActiveStack>> {
+  let text: string;
   try {
-    stack = parseStack(JSON.parse(text) as unknown);
+    text = await readFile(stacksPath(paths), 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      try {
+        const stack = parseStack(
+          JSON.parse(await readFile(stackPath(paths), 'utf8')) as unknown,
+        );
+        return new Map([[stack.target, stack]]);
+      } catch (legacyError) {
+        if ((legacyError as NodeJS.ErrnoException).code === 'ENOENT')
+          return new Map();
+        if (legacyError instanceof LayerdotsError) throw legacyError;
+        throw new LayerdotsError(
+          'Active stack configuration is invalid.',
+          'STACK_INVALID',
+          { cause: legacyError },
+        );
+      }
+    }
+    throw error;
+  }
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      (parsed as Record<string, unknown>).version !== 1 ||
+      !Array.isArray((parsed as Record<string, unknown>).stacks)
+    ) {
+      throw new LayerdotsError(
+        'Active stack configuration is invalid.',
+        'STACK_INVALID',
+      );
+    }
+    const stacks = new Map<string, ActiveStack>();
+    for (const value of (parsed as { stacks: unknown[] }).stacks) {
+      const stack = parseStack(value);
+      if (stacks.has(stack.target))
+        throw new LayerdotsError(
+          'Active stack configuration is invalid.',
+          'STACK_INVALID',
+        );
+      stacks.set(stack.target, stack);
+    }
+    return stacks;
   } catch (error) {
     if (error instanceof LayerdotsError) throw error;
     throw new LayerdotsError(
@@ -99,11 +182,4 @@ export async function readActiveStack(
       },
     );
   }
-  if (stack.target !== resolve(target)) {
-    throw new LayerdotsError(
-      `No active stack is configured for target ${resolve(target)}.`,
-      'STACK_TARGET_NOT_CONFIGURED',
-    );
-  }
-  return stack;
 }
