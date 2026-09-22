@@ -1,77 +1,138 @@
 # Layerdots
 
-Status: Milestone 5 stack lifecycle complete.
+Status: Milestone 5 stack lifecycle complete. Layerdots is pre-release; command names and behavior may still change. See [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) for the current milestone.
 
-Layerdots composes dotfiles from an ordered stack of Git repositories. It safely applies a composed stack to an explicit target, preserves unmanaged files and local target edits, and isolates conflicts outside the live target.
+Layerdots composes your dotfiles from an ordered stack of Git repositories: a public **base** (e.g. your personal dotfiles) and zero or more private **overlays** stacked on top (e.g. work configuration). It applies the composed result to a target directory, preserves files it doesn't manage and edits you've made by hand, and keeps private content out of the public base unless you explicitly put it there.
 
-Development and tests are intentionally sandboxed under the ignored `.layerdots-dev/` directory. Applying to the real home remains behind an explicit double opt-in.
+See [`CONTEXT.md`](CONTEXT.md) for the full domain model and terminology used below, and <https://stevenocchipinti.github.io/layerdots/> for a visual explainer.
 
-## Development
+## Installation
+
+Layerdots isn't published yet. Build it from source:
 
 ```sh
 corepack pnpm install
-corepack pnpm verify
+corepack pnpm build
 ```
 
-The test suite clears `.layerdots-dev/` once at the start of every run, so its size is bounded by the run in progress. Run `corepack pnpm clean` at any time to remove `.layerdots-dev/`, `dist/`, and `coverage/` manually.
-
-For a usable prototype, initialize from the top overlay remote and use an explicit sandbox target:
+This produces a `layerdots` executable at `dist/cli/main.js` (declared as the `bin` in `package.json`). Run it directly with Node, or link it onto your `PATH`:
 
 ```sh
-corepack pnpm dev -- init <private-overlay-url> --target ~/layerdots-sandbox
-corepack pnpm dev -- inspect --target ~/layerdots-sandbox
-corepack pnpm dev -- apply --target ~/layerdots-sandbox
+node dist/cli/main.js --version
+# or
+corepack pnpm link --global
+layerdots --version
 ```
 
-`init` clones the overlay and each pinned parent under XDG data storage, verifies the parent commits, and records the active stack in XDG configuration. It never writes the target. `apply` stores its merge base in XDG state and writes only managed paths.
+The examples below assume `layerdots` is on your `PATH`. If you're running it unlinked, substitute `node dist/cli/main.js`.
 
-Each target has one active stack. To replace it, stage a reviewed three-way transition rather than replacing live files immediately:
+## Quick start
+
+Point Layerdots at your top overlay's Git URL and an explicit target directory. `init` clones the overlay and each of its pinned parents, verifies them, and registers the target's active stack — it never writes to the target itself:
 
 ```sh
-corepack pnpm dev -- switch <new-top-overlay-url> --target ~/layerdots-sandbox
-corepack pnpm dev -- status --target ~/layerdots-sandbox
-corepack pnpm dev -- diff --target ~/layerdots-sandbox
-corepack pnpm dev -- switch apply --target ~/layerdots-sandbox
+layerdots init <private-overlay-url> --target ~/dotfiles-sandbox
+layerdots inspect --target ~/dotfiles-sandbox
+layerdots apply --target ~/dotfiles-sandbox
 ```
 
-`switch` leaves the target and active stack unchanged until `switch apply`. Conflicts are isolated outside the target. A completed switch removes its transient staged snapshot, preserves unmanaged files and non-conflicting target edits through the three-way merge, and retains managed repository clones for later reuse.
+`inspect` shows the composed result and where each path comes from. `apply` writes only managed paths to the target, records the result as the new merge base, and leaves everything else in the target untouched.
 
-Capture a target edit into the active overlay, review it, then commit and publish it:
+Each target has one active stack at a time. `--target` should point at the real location you want dotfiles applied to (commonly your home directory); use a sandbox directory first if you want to try Layerdots safely before pointing it at somewhere important.
+
+## Capturing and publishing a change
+
+Edit a managed file in your target as you normally would, then route the change to a layer, review it, and publish it:
 
 ```sh
-corepack pnpm dev -- status --target ~/layerdots-sandbox
-corepack pnpm dev -- assign .gitconfig --layer overlay --interactive --target ~/layerdots-sandbox
-corepack pnpm dev -- diff --target ~/layerdots-sandbox
-corepack pnpm dev -- commit --message "Update work Git identity" --target ~/layerdots-sandbox
-corepack pnpm dev -- push --target ~/layerdots-sandbox
+layerdots status --target ~/dotfiles-sandbox
+layerdots assign .gitconfig --layer overlay --interactive --target ~/dotfiles-sandbox
+layerdots diff --target ~/dotfiles-sandbox
+layerdots commit --message "Update work Git identity" --target ~/dotfiles-sandbox
+layerdots push --target ~/dotfiles-sandbox
 ```
 
-The selector offers each hunk as `y` (stage), `n` (skip), `l` (choose changed lines), or `q` (cancel). Non-interactive use can select hunk numbers with `--select 1,2` or changed edit numbers with `--select 1:2.3`; numbering is one-based. A selected addition inserts that line and a selected removal deletes that line, so either side of a replacement can be staged independently. `status` and `diff` display the staged transaction and its remaining target difference. Read-only `inspect`, `status`, and `diff` accept `--json`; `inspect` and `diff` accept `--color always|auto|never` and honor `NO_COLOR` in auto mode.
+`status` lists unassigned target changes. `assign` stages a change onto a chosen layer:
 
-A staged transaction can hold more than one assignment before it is committed: distinct hunks of the same path can be routed to different layers across separate `assign` calls, and `assign` and `move` can be combined, as long as each call still has an unassigned or movable change to route.
+- `--interactive` opens a `git add -p`-style selector. Each hunk offers `y` (stage), `n` (skip), `l` (choose individual changed lines), or `q` (cancel).
+- `--select 1,2` stages whole hunks non-interactively by number (one-based).
+- `--select 1:2.3` stages individual changed lines within a hunk (`hunk:line.line`).
+- `--all-hunks` stages every hunk for the path.
 
-To move already stored content between layers, stage an explicit delete-and-readd transaction, review it, then commit:
+A single staged transaction can hold more than one assignment: separate `assign` calls can route distinct hunks of the same path to different layers, and `assign` can be combined with `move` (below), before one `commit`. `commit` writes the staged changes into each affected layer's repository, from base upward. `push` publishes committed layers to their remotes, base first, stopping if a push fails.
+
+## Moving already-committed content between layers
+
+To relocate content that's already stored in a layer (not just a pending target edit), stage an explicit move, review it, then commit:
 
 ```sh
-corepack pnpm dev -- move .gitconfig --from base --to overlay --target ~/layerdots-sandbox
-corepack pnpm dev -- diff --target ~/layerdots-sandbox
-corepack pnpm dev -- commit --message "Move Git identity to work layer" --target ~/layerdots-sandbox
+layerdots move .gitconfig --from base --to overlay --target ~/dotfiles-sandbox
+layerdots diff --target ~/dotfiles-sandbox
+layerdots commit --message "Move Git identity to work layer" --target ~/dotfiles-sandbox
 ```
 
-Moves preserve the effective target content. Moving private material to the base is an explicit assignment and may publish it when pushed.
+Moves preserve the effective content your target sees. Moving private material down to the base is an explicit choice, and it may publish that content when you next `push`.
 
-To abandon a staged assignment, move, or stack switch before it is committed or applied, run `corepack pnpm dev -- discard --target ~/layerdots-sandbox`. It removes only the staged transaction or stack switch state; the target, the active stack, and every managed clone are left untouched.
+## Switching stacks
 
-Before committing local changes after a remote update, run `corepack pnpm dev -- sync --target ~/layerdots-sandbox`. Synchronization fetches every layer, rejects divergence, and stages non-conflicting parent rebases. Conflicts are written below XDG state while the live target and active stack remain unchanged. If synchronization is interrupted while it temporarily checks out a remote commit, run `corepack pnpm dev -- sync recover --target ~/layerdots-sandbox` before retrying.
-
-For development and explicit local repository testing, repositories can still be supplied directly:
+Replacing the top overlay is staged as a reviewable three-way transition, not an immediate swap:
 
 ```sh
-corepack pnpm dev -- inspect --base ./base --overlay ./overlay --color never
+layerdots switch <new-top-overlay-url> --target ~/dotfiles-sandbox
+layerdots status --target ~/dotfiles-sandbox
+layerdots diff --target ~/dotfiles-sandbox
+layerdots switch apply --target ~/dotfiles-sandbox
 ```
 
-An optional `--target` points to a sandbox directory containing a literal `home/` tree. Only composed managed paths are read.
+The target and active stack stay unchanged until `switch apply`. Conflicts are isolated outside the target rather than left as merge markers in your files. A completed switch preserves unmanaged files and non-conflicting target edits, removes its transient staged snapshot, and keeps managed repository clones around for later reuse.
 
-Implementation progress and the next resume point are recorded in [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md).
+## Staying in sync
 
-<https://stevenocchipinti.github.io/layerdots/>
+Before committing local changes after an upstream update, synchronize:
+
+```sh
+layerdots sync --target ~/dotfiles-sandbox
+```
+
+This fetches every layer, rejects diverged branches (Layerdots never force-pushes), and stages non-conflicting parent rebases. Conflicts are written outside the live target, which is left unchanged along with the active stack. If synchronization is interrupted while it has a remote commit temporarily checked out, recover before retrying:
+
+```sh
+layerdots sync recover --target ~/dotfiles-sandbox
+```
+
+## Undoing a staged change
+
+To abandon a staged assignment, move, or stack switch before it's committed or applied:
+
+```sh
+layerdots discard --target ~/dotfiles-sandbox
+```
+
+This removes only the staged transaction or stack switch. The target, the active stack, and every managed clone are left untouched.
+
+## Read-only output: JSON and color
+
+`inspect`, `status`, and `diff` are read-only and accept `--json` for scripting. `inspect` and `diff` also accept `--color always|auto|never` and honor `NO_COLOR` when color is `auto` (the default).
+
+```sh
+layerdots status --target ~/dotfiles-sandbox --json
+layerdots diff --target ~/dotfiles-sandbox --color never
+```
+
+## Working without an active stack
+
+`inspect` can also be pointed directly at local repository directories, without an `init`-registered target — useful for a one-off look at repositories you already have checked out:
+
+```sh
+layerdots inspect --base ./base --overlay ./overlay --color never
+```
+
+An optional `--target` adds a sandbox directory containing a literal `home/` tree for comparison; only its composed managed paths are read.
+
+## Learn more
+
+- [`CONTEXT.md`](CONTEXT.md) — domain model, terminology, and product invariants.
+- [`docs/adr/`](docs/adr) — rationale for consequential architectural decisions.
+- [`PLAN.md`](PLAN.md) — implementation roadmap and open design decisions.
+- [`DEVELOPMENT.md`](DEVELOPMENT.md) — building, testing, and contributing to Layerdots itself.
+- <https://stevenocchipinti.github.io/layerdots/> — visual concept explainer.
